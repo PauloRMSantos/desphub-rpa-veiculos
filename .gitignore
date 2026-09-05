@@ -1,0 +1,22 @@
+# Binários
+/bin/
+/rpa
+*.exe
+
+# Ambiente / segredos (LGPD: nunca commitar credenciais)
+.env
+*.local
+
+# Sessão persistida do navegador (cookies gov.br)
+/user-data-dir/
+/session/
+
+# Go
+*.test
+*.out
+/vendor/
+
+# SO / editor
+.DS_Store
+.idea/
+.vscode/

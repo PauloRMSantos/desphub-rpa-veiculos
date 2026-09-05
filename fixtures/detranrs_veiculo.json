@@ -1,0 +1,71 @@
+{
+  "identificacao": {
+    "erro": null,
+    "temErro": false,
+    "marcaModelo": "VW/FUSCA",
+    "renavam": 123456789,
+    "ufPlaca": "RS",
+    "municipioRegistro": "PORTO ALEGRE",
+    "tipo": "Automóvel",
+    "cor": "Bege",
+    "especie": "Passageiro",
+    "placa": "ABC1D23",
+    "chassi": "9BWZZZ00ZZZ000000",
+    "situacao": "Em circulação",
+    "cpfProprietario": "00000000000",
+    "tipoPessoa": 1,
+    "codMunicipio": 0,
+    "municipio": "",
+    "furtado": false,
+    "emDeposito": false,
+    "anoFabricacao": 1986,
+    "anoModelo": 1986,
+    "temErroLicenciamento": false,
+    "exercLicenciamento": 2026,
+    "dtLicenciamento": "20/02/2026",
+    "dtVencLicenciamento": "31/07/2027",
+    "atpveCvPendente": null
+  },
+  "licenciamento": {
+    "erro": null,
+    "temErro": false,
+    "exercicio": "2026",
+    "situacaoDocumento": "Documento disponibilizado",
+    "descDocumento": "CRLV",
+    "indCrlve": 2,
+    "temCrlve": true,
+    "fac": true
+  },
+  "caracteristicaEspecial": { "erro": null, "temErro": false, "caracteristicas": null },
+  "imposto": {
+    "erro": null,
+    "temErro": false,
+    "historico": [
+      { "exercicio": "2026", "situacao": "Devido", "dataVencimento": "31/03/2026", "valorOriginal": "R$ 1.234,56", "debitos": null, "dividaAtiva": false },
+      { "exercicio": "2025", "situacao": "Isento", "dataVencimento": null, "valorOriginal": "R$ 0,00", "debitos": null, "dividaAtiva": false },
+      { "exercicio": "2024", "situacao": "Isento", "dataVencimento": null, "valorOriginal": "R$ 0,00", "debitos": null, "dividaAtiva": false }
+    ]
+  },
+  "seguro": {
+    "erro": null,
+    "temErro": false,
+    "exercicioAtual": "2026",
+    "valorExercAtual": "R$ 0,00",
+    "situacaoExercAtual": "Não devido"
+  },
+  "infracao": {
+    "erro": null,
+    "temErro": false,
+    "qtVencidas": 0,
+    "vlVencidas": "R$ 0,00"
+  },
+  "restricao": { "erro": null, "temErro": false, "restricoes": null },
+  "furtadoRoubado": null,
+  "mensagem": { "erro": null, "temErro": false, "mensagens": [] },
+  "expedicaoDocumento": {
+    "erro": null,
+    "temErro": false,
+    "txtSitLic": "Veiculo Licenciado",
+    "exercRefLic": 2026
+  }
+}

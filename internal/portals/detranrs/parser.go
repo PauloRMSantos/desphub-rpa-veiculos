@@ -28,6 +28,8 @@ type apiResposta struct {
 		AnoFabricacao       int    `json:"anoFabricacao"`
 		AnoModelo           int    `json:"anoModelo"`
 		DtVencLicenciamento string `json:"dtVencLicenciamento"`
+		Furtado             bool   `json:"furtado"`
+		EmDeposito          bool   `json:"emDeposito"`
 	} `json:"identificacao"`
 
 	Licenciamento struct {
@@ -52,11 +54,32 @@ type apiResposta struct {
 		TemErro    bool `json:"temErro"`
 		Restricoes []struct {
 			// TODO: confirmar campos reais quando houver um veículo com
-			// restrição
+			// restrição (veio null no fixture real)
 			Tipo      string `json:"tipo"`
 			Descricao string `json:"descricao"`
 		} `json:"restricoes"`
 	} `json:"restricao"`
+
+	Seguro struct {
+		TemErro            bool   `json:"temErro"`
+		ExercicioAtual     string `json:"exercicioAtual"`
+		ValorExercAtual    string `json:"valorExercAtual"`
+		SituacaoExercAtual string `json:"situacaoExercAtual"`
+	} `json:"seguro"`
+
+	Infracao struct {
+		TemErro      bool   `json:"temErro"`
+		QtAgPrazoDef int    `json:"qtAgPrazoDef"`
+		VlAgPrazoDef string `json:"vlAgPrazoDef"`
+		QtAgPrazoJulg int   `json:"qtAgPrazoJulg"`
+		VlAgPrazoJulg string `json:"vlAgPrazoJulg"`
+		QtAVencer    int    `json:"qtAVencer"`
+		VlAVencer    string `json:"vlAVencer"`
+		QtSuspensas  int    `json:"qtSuspensas"`
+		VlSuspensas  string `json:"vlSuspensas"`
+		QtVencidas   int    `json:"qtVencidas"`
+		VlVencidas   string `json:"vlVencidas"`
+	} `json:"infracao"`
 }
 
 func ParseVeiculo(raw []byte) (*model.ConsultaResponse, error) {
@@ -115,6 +138,41 @@ func ParseVeiculo(raw []byte) (*model.ConsultaResponse, error) {
 			Tipo:      rr.Tipo,
 			Descricao: rr.Descricao,
 		})
+	}
+
+	if id.Furtado {
+		resp.Restricoes = append(resp.Restricoes, model.Restricao{
+			Tipo:      "ROUBO_FURTO",
+			Descricao: "Veículo com registro de roubo/furto",
+		})
+	}
+	if id.EmDeposito {
+		resp.Restricoes = append(resp.Restricoes, model.Restricao{
+			Tipo:      "EM_DEPOSITO",
+			Descricao: "Veículo em depósito",
+		})
+	}
+
+	if s := r.Seguro; !ehIsento(s.SituacaoExercAtual) {
+		if valor := normalizeValorBRL(s.ValorExercAtual); valor != "0.00" {
+			resp.Debitos = append(resp.Debitos, model.Debito{
+				Tipo:      "DPVAT",
+				Exercicio: atoiSafe(s.ExercicioAtual),
+				Valor:     valor,
+			})
+		}
+	}
+
+	inf := r.Infracao
+	total := inf.QtAVencer + inf.QtVencidas + inf.QtSuspensas + inf.QtAgPrazoDef + inf.QtAgPrazoJulg
+	if total > 0 {
+		resp.Infracoes = &model.Infracoes{
+			AVencer:               model.ResumoInfracao{Quantidade: inf.QtAVencer, Valor: normalizeValorBRL(inf.VlAVencer)},
+			Vencidas:              model.ResumoInfracao{Quantidade: inf.QtVencidas, Valor: normalizeValorBRL(inf.VlVencidas)},
+			Suspensas:             model.ResumoInfracao{Quantidade: inf.QtSuspensas, Valor: normalizeValorBRL(inf.VlSuspensas)},
+			AguardandoPrazoDefesa: model.ResumoInfracao{Quantidade: inf.QtAgPrazoDef, Valor: normalizeValorBRL(inf.VlAgPrazoDef)},
+			AguardandoJulgamento:  model.ResumoInfracao{Quantidade: inf.QtAgPrazoJulg, Valor: normalizeValorBRL(inf.VlAgPrazoJulg)},
+		}
 	}
 
 	return resp, nil

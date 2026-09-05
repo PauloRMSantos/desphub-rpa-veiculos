@@ -61,6 +61,8 @@ func (c *Client) Consultar(ctx context.Context, placa, renavam string) (*model.C
 	return ParseVeiculo(raw)
 }
 
+const maxTentativas = 3
+
 func (c *Client) ConsultarVeiculo(ctx context.Context, placa, renavam string) ([]byte, error) {
 	if c.auth.Bearer == "" || c.auth.UserID == "" {
 		return nil, fmt.Errorf("detranrs: credenciais ausentes (Bearer/X-User-Id) — faça o login primeiro")
@@ -72,9 +74,35 @@ func (c *Client) ConsultarVeiculo(ctx context.Context, placa, renavam string) ([
 	q.Set("contabiliza", "false")
 	endpoint += "?" + q.Encode()
 
+	var lastErr error
+	for tentativa := 1; tentativa <= maxTentativas; tentativa++ {
+		body, status, err := c.doGet(ctx, endpoint)
+		switch {
+		case err != nil:
+			lastErr = err
+		case status == http.StatusUnauthorized || status == http.StatusForbidden:
+			return nil, fmt.Errorf("%w (HTTP %d)", ErrSessaoExpirada, status)
+		case status >= 500:
+			lastErr = fmt.Errorf("detranrs: API devolveu HTTP %d", status)
+		case status != http.StatusOK:
+			return nil, fmt.Errorf("detranrs: API devolveu HTTP %d", status)
+		default:
+			return body, nil
+		}
+
+		if tentativa < maxTentativas {
+			if err := esperarBackoff(ctx, tentativa); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return nil, fmt.Errorf("detranrs: falha após %d tentativas: %w", maxTentativas, lastErr)
+}
+
+func (c *Client) doGet(ctx context.Context, endpoint string) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("Authorization", "Bearer "+c.auth.Bearer)
@@ -85,19 +113,23 @@ func (c *Client) ConsultarVeiculo(ctx context.Context, placa, renavam string) ([
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("detranrs: request veículo: %w", err)
+		return nil, 0, fmt.Errorf("detranrs: request veículo: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("detranrs: lendo corpo: %w", err)
+		return nil, resp.StatusCode, fmt.Errorf("detranrs: lendo corpo: %w", err)
 	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("%w (HTTP %d)", ErrSessaoExpirada, resp.StatusCode)
+	return body, resp.StatusCode, nil
+}
+
+func esperarBackoff(ctx context.Context, tentativa int) error {
+	d := time.Duration(200*(1<<(tentativa-1))) * time.Millisecond
+	select {
+	case <-time.After(d):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("detranrs: API devolveu HTTP %d", resp.StatusCode)
-	}
-	return body, nil
 }

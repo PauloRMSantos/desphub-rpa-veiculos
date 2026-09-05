@@ -2,6 +2,7 @@ package consulta
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -36,9 +37,13 @@ func (s *Service) Executar(ctx context.Context, jobID string, req model.Consulta
 
 	resp, err := s.portal.Consultar(ctx, req.Placa, req.Renavam)
 	if err != nil {
-		log.Error("falha na consulta ao portal", "etapa", "portal", "erro", err.Error())
+		etapa := "portal"
+		if errors.Is(err, model.ErrReconexaoNecessaria) {
+			etapa = "reconexao"
+		}
+		log.Error("falha na consulta ao portal", "etapa", etapa, "erro", err.Error())
 		base.Status = model.StatusErro
-		base.Erros = []model.EtapaErro{{Etapa: "portal", Mensagem: err.Error()}}
+		base.Erros = []model.EtapaErro{{Etapa: etapa, Mensagem: err.Error()}}
 		return base
 	}
 
@@ -58,6 +63,17 @@ func (s *Service) Executar(ctx context.Context, jobID string, req model.Consulta
 		pii.Anonimizar(resp)
 	}
 	return *resp
+}
+
+type Reconectavel interface {
+	Reconectar(ctx context.Context) error
+}
+
+func (s *Service) Reconectar(ctx context.Context) error {
+	if r, ok := s.portal.(Reconectavel); ok {
+		return r.Reconectar(ctx)
+	}
+	return errors.New("portal não suporta reconexão manual")
 }
 
 // classificar decide SUCESSO/PARCIAL com base no que foi extraído.

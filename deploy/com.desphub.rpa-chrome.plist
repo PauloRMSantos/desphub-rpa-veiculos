@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent que sobe o Chrome sidecar (depuração remota + perfil persistente)
+  no login do usuário, para o RPA se conectar sem ninguém abrir na mão.
+
+  Instalar:
+    cp deploy/com.desphub.rpa-chrome.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.desphub.rpa-chrome.plist
+  Parar/remover:
+    launchctl unload ~/Library/LaunchAgents/com.desphub.rpa-chrome.plist
+
+  Ajuste o caminho de ProgramArguments para o seu checkout do projeto.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.desphub.rpa-chrome</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/paulorosantos/Documents/scrapper/scripts/start-chrome.sh</string>
+    </array>
+
+    <!-- Sobe ao logar. Não reinicia sozinho (o operador controla a janela). -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/desphub-chrome.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/desphub-chrome.err.log</string>
+</dict>
+</plist>

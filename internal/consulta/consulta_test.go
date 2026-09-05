@@ -23,6 +23,52 @@ func (p portalFake) Consultar(_ context.Context, _, _ string) (*model.ConsultaRe
 
 func newLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
+// portalReconectavel implementa Portal + Reconectavel.
+type portalReconectavel struct {
+	portalFake
+	reconectouChamado bool
+	reconectarErr     error
+}
+
+func (p *portalReconectavel) Reconectar(_ context.Context) error {
+	p.reconectouChamado = true
+	return p.reconectarErr
+}
+
+func TestExecutarReconexaoNecessariaMarcaEtapa(t *testing.T) {
+	fake := portalFake{err: model.ErrReconexaoNecessaria}
+	svc := NewService(fake, newLog(), false)
+
+	got := svc.Executar(context.Background(), "job-r", model.ConsultaRequest{Placa: "ABC1D23"})
+
+	if got.Status != model.StatusErro {
+		t.Fatalf("status = %q; quero ERRO", got.Status)
+	}
+	if len(got.Erros) != 1 || got.Erros[0].Etapa != "reconexao" {
+		t.Errorf("esperava etapa 'reconexao', veio %+v", got.Erros)
+	}
+}
+
+func TestReconectarChamaPortal(t *testing.T) {
+	fake := &portalReconectavel{}
+	svc := NewService(fake, newLog(), false)
+
+	if err := svc.Reconectar(context.Background()); err != nil {
+		t.Fatalf("Reconectar erro: %v", err)
+	}
+	if !fake.reconectouChamado {
+		t.Error("esperava que o portal.Reconectar fosse chamado")
+	}
+}
+
+func TestReconectarPortalSemSuporte(t *testing.T) {
+	// portalFake não implementa Reconectavel.
+	svc := NewService(portalFake{}, newLog(), false)
+	if err := svc.Reconectar(context.Background()); err == nil {
+		t.Error("esperava erro quando o portal não suporta reconexão")
+	}
+}
+
 func TestExecutarSucesso(t *testing.T) {
 	fake := portalFake{resp: &model.ConsultaResponse{
 		Veiculo: &model.Veiculo{MarcaModelo: "VW/FUSCA"},

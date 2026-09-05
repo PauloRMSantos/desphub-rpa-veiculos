@@ -20,10 +20,14 @@ const (
 	apiHostMatch = "procergs.com.br"
 
 	LoginManualTimeout = 5 * time.Minute
+	LoginSilentTimeout = 25 * time.Second
 )
 
-func Login(ctx context.Context, sess *browser.Session, log *slog.Logger) (Auth, error) {
+func Login(ctx context.Context, sess *browser.Session, log *slog.Logger, timeout time.Duration) (Auth, error) {
 	log = logger.FromContext(ctx, log)
+	if timeout <= 0 {
+		timeout = LoginManualTimeout
+	}
 
 	var (
 		mu       sync.Mutex
@@ -52,7 +56,7 @@ func Login(ctx context.Context, sess *browser.Session, log *slog.Logger) (Auth, 
 		once.Do(func() { close(done) })
 	})
 
-	runCtx, cancel := context.WithTimeout(sess.Ctx(), LoginManualTimeout+30*time.Second)
+	runCtx, cancel := context.WithTimeout(sess.Ctx(), timeout+30*time.Second)
 	defer cancel()
 	go func() {
 		select {
@@ -73,15 +77,15 @@ func Login(ctx context.Context, sess *browser.Session, log *slog.Logger) (Auth, 
 			log.Info(">> AÇÃO NECESSÁRIA: faça o LOGIN no gov.br na janela do Chrome que abriu.")
 			log.Info(">> O RPA assume automaticamente assim que você concluir o login.")
 			log.Info("=======================================================",
-				"aguardandoAte", LoginManualTimeout.String())
+				"aguardandoAte", timeout.String())
 			return nil
 		}),
 		chromedp.ActionFunc(func(c context.Context) error {
 			select {
 			case <-done:
 				return nil
-			case <-time.After(LoginManualTimeout):
-				return fmt.Errorf("tempo esgotado aguardando o login manual (%s)", LoginManualTimeout)
+			case <-time.After(timeout):
+				return fmt.Errorf("tempo esgotado aguardando captura do token (%s)", timeout)
 			case <-c.Done():
 				return c.Err()
 			}

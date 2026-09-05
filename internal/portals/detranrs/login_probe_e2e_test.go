@@ -32,7 +32,7 @@ func TestLoginProbe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 
-	auth, err := Login(ctx, sess, log)
+	auth, err := Login(ctx, sess, log, LoginManualTimeout)
 	if err != nil {
 		t.Fatalf("Login falhou: %v", err)
 	}

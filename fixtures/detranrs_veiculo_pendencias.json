@@ -1,0 +1,56 @@
+{
+  "identificacao": {
+    "temErro": false,
+    "marcaModelo": "FIAT/UNO MILLE",
+    "renavam": 987654321,
+    "ufPlaca": "RS",
+    "municipioRegistro": "CANOAS",
+    "tipo": "Automóvel",
+    "cor": "Vermelha",
+    "especie": "Passageiro",
+    "placa": "XYZ9A88",
+    "chassi": "9BD00000000000000",
+    "situacao": "Em circulação",
+    "cpfProprietario": "00000000000",
+    "furtado": true,
+    "emDeposito": false,
+    "anoFabricacao": 2008,
+    "anoModelo": 2009,
+    "dtVencLicenciamento": "31/10/2026"
+  },
+  "licenciamento": {
+    "temErro": false,
+    "exercicio": "2026",
+    "situacaoDocumento": "Licenciamento em aberto",
+    "descDocumento": "CRLV"
+  },
+  "imposto": {
+    "temErro": false,
+    "historico": [
+      { "exercicio": "2026", "situacao": "Devido", "dataVencimento": "31/03/2026", "valorOriginal": "R$ 1.234,56", "dividaAtiva": false },
+      { "exercicio": "2025", "situacao": "Devido", "dataVencimento": "31/03/2025", "valorOriginal": "R$ 980,00", "dividaAtiva": true }
+    ]
+  },
+  "seguro": {
+    "temErro": false,
+    "exercicioAtual": "2026",
+    "valorExercAtual": "R$ 105,65",
+    "situacaoExercAtual": "Devido"
+  },
+  "infracao": {
+    "temErro": false,
+    "qtAgPrazoDef": 0, "vlAgPrazoDef": "R$ 0,00",
+    "qtAgPrazoJulg": 1, "vlAgPrazoJulg": "R$ 195,23",
+    "qtAVencer": 1, "vlAVencer": "R$ 130,16",
+    "qtSuspensas": 0, "vlSuspensas": "R$ 0,00",
+    "qtVencidas": 2, "vlVencidas": "R$ 293,47"
+  },
+  "restricao": {
+    "temErro": false,
+    "restricoes": [
+      { "tipo": "ADMINISTRATIVA", "descricao": "Restrição administrativa - RENAJUD" }
+    ]
+  },
+  "furtadoRoubado": null,
+  "expedicaoDocumento": { "temErro": false, "txtSitLic": "Licenciamento em aberto", "exercRefLic": 2026 }
+}

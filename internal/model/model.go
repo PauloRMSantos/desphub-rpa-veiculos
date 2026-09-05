@@ -1,13 +1,12 @@
-// Package model define os contratos (DTOs) de entrada e saída do serviço,
-// alinhados com o backend Spring Boot.
-//
-// Convenção crítica: valores monetários são SEMPRE string decimal (ex.: "1234.56")
-// para casar com BigDecimal no backend. Nunca float.
 package model
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
-// TipoConsulta enumera os grupos de dados que podem ser solicitados.
+var ErrReconexaoNecessaria = errors.New("sessão do portal expirada — reconecte o gov.br")
+
 type TipoConsulta string
 
 const (
@@ -17,7 +16,6 @@ const (
 	TipoLicenciamento   TipoConsulta = "LICENCIAMENTO"
 )
 
-// Status representa o resultado geral de uma consulta.
 type Status string
 
 const (
@@ -26,14 +24,11 @@ const (
 	StatusErro    Status = "ERRO"
 )
 
-// Credenciais são as credenciais do portal (gov.br), quando exigido login.
-// NUNCA devem ser logadas nem serializadas em respostas.
 type Credenciais struct {
 	Usuario string `json:"usuario"`
 	Senha   string `json:"senha"`
 }
 
-// ConsultaRequest é o corpo de POST /api/v1/consultas.
 type ConsultaRequest struct {
 	Placa       string         `json:"placa"`
 	Renavam     string         `json:"renavam"`
@@ -42,7 +37,6 @@ type ConsultaRequest struct {
 	Credenciais *Credenciais   `json:"credenciais,omitempty"`
 }
 
-// Veiculo agrupa os dados cadastrais normalizados.
 type Veiculo struct {
 	Placa           string `json:"placa,omitempty"`
 	Renavam         string `json:"renavam,omitempty"`
@@ -58,11 +52,9 @@ type Veiculo struct {
 	UfPlaca         string `json:"ufPlaca,omitempty"`
 	Combustivel     string `json:"combustivel,omitempty"`
 	SituacaoRenavam string `json:"situacaoRenavam,omitempty"` // ex.: "Em circulação"
-	// CpfProprietario é PII sensível: NUNCA logar em claro; entregue só ao backend.
 	CpfProprietario string `json:"cpfProprietario,omitempty"`
 }
 
-// Licenciamento resume a situação do CRLV/exercício atual.
 type Licenciamento struct {
 	Exercicio         string `json:"exercicio,omitempty"`
 	SituacaoDocumento string `json:"situacaoDocumento,omitempty"`
@@ -70,14 +62,11 @@ type Licenciamento struct {
 	DataVencimento    string `json:"dataVencimento,omitempty"`
 }
 
-// Restricao descreve um bloqueio/restrição administrativa ou judicial.
 type Restricao struct {
 	Tipo      string `json:"tipo"`
 	Descricao string `json:"descricao"`
 }
 
-// Debito descreve um débito (IPVA, licenciamento, taxa, multa).
-// Valor é string decimal (casar com BigDecimal).
 type Debito struct {
 	Tipo       string `json:"tipo"`
 	Exercicio  int    `json:"exercicio,omitempty"`
@@ -85,13 +74,24 @@ type Debito struct {
 	Vencimento string `json:"vencimento,omitempty"`
 }
 
-// EtapaErro registra em que passo do fluxo houve falha.
+type ResumoInfracao struct {
+	Quantidade int    `json:"quantidade"`
+	Valor      string `json:"valor"`
+}
+
+type Infracoes struct {
+	AVencer               ResumoInfracao `json:"aVencer"`
+	Vencidas              ResumoInfracao `json:"vencidas"`
+	Suspensas             ResumoInfracao `json:"suspensas"`
+	AguardandoPrazoDefesa ResumoInfracao `json:"aguardandoPrazoDefesa"`
+	AguardandoJulgamento  ResumoInfracao `json:"aguardandoJulgamento"`
+}
+
 type EtapaErro struct {
 	Etapa    string `json:"etapa"`
 	Mensagem string `json:"mensagem"`
 }
 
-// ConsultaResponse é a resposta de POST /api/v1/consultas.
 type ConsultaResponse struct {
 	JobID      string      `json:"jobId"`
 	Placa      string      `json:"placa"`
@@ -99,6 +99,7 @@ type ConsultaResponse struct {
 	ColetadoEm time.Time   `json:"coletadoEm"`
 	Veiculo       *Veiculo       `json:"veiculo,omitempty"`
 	Licenciamento *Licenciamento `json:"licenciamento,omitempty"`
+	Infracoes     *Infracoes     `json:"infracoes,omitempty"`
 	Restricoes    []Restricao    `json:"restricoes,omitempty"`
 	Debitos       []Debito       `json:"debitos,omitempty"`
 	Status        Status         `json:"status"`

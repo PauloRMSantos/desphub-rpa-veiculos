@@ -3,8 +3,10 @@ package detranrs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/paulorosantos/desphub-rpa/internal/browser"
 	"github.com/paulorosantos/desphub-rpa/internal/model"
@@ -18,7 +20,6 @@ type SessionPortal struct {
 	mu     sync.Mutex
 	authed bool
 }
-
 
 func NewSessionPortal(sess *browser.Session, baseURL string, log *slog.Logger) *SessionPortal {
 	return &SessionPortal{
@@ -37,13 +38,20 @@ func (p *SessionPortal) Consultar(ctx context.Context, placa, renavam string) (*
 
 	resp, err := p.client.Consultar(ctx, placa, renavam)
 	if errors.Is(err, ErrSessaoExpirada) {
-		p.log.Info("sessão expirada; refazendo login")
-		if err := p.garantirLogin(ctx, true); err != nil {
+		p.log.Info("sessão expirada; tentando refresh silencioso")
+		if err := p.refreshSilencioso(ctx); err != nil {
 			return nil, err
 		}
 		resp, err = p.client.Consultar(ctx, placa, renavam)
 	}
 	return resp, err
+}
+
+func (p *SessionPortal) Reconectar(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.authed = false
+	return p.loginComTimeout(ctx, LoginManualTimeout)
 }
 
 func (p *SessionPortal) garantirLogin(ctx context.Context, forcar bool) error {
@@ -52,7 +60,21 @@ func (p *SessionPortal) garantirLogin(ctx context.Context, forcar bool) error {
 	if p.authed && !forcar {
 		return nil
 	}
-	auth, err := Login(ctx, p.sess, p.log)
+	return p.loginComTimeout(ctx, LoginManualTimeout)
+}
+
+func (p *SessionPortal) refreshSilencioso(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err := p.loginComTimeout(ctx, LoginSilentTimeout); err != nil {
+		p.log.Warn("refresh silencioso falhou; requer reconexão manual", "erro", err.Error())
+		return fmt.Errorf("%w (detalhe: %v)", model.ErrReconexaoNecessaria, err)
+	}
+	return nil
+}
+
+func (p *SessionPortal) loginComTimeout(ctx context.Context, timeout time.Duration) error {
+	auth, err := Login(ctx, p.sess, p.log, timeout)
 	if err != nil {
 		p.authed = false
 		return err

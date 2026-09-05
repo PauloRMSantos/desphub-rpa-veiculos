@@ -35,8 +35,6 @@ func main() {
 	var svc *consulta.Service
 	var sess *browser.Session
 	if cfg.LoginMode == "manual" {
-		// Conecta-se ao Chrome do operador (aberto com --remote-debugging-port).
-		// Navegador real evita a detecção de bot que invalida o captcha do gov.br.
 		s, err := browser.NewRemoteSession(cfg.ChromeDebugURL, browser.Options{
 			NavTimeout:   cfg.NavTimeout,
 			PageLoadWait: cfg.PageLoadWait,

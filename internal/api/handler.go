@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -15,18 +16,21 @@ import (
 )
 
 type Server struct {
-	log *slog.Logger
-	svc *consulta.Service
+	log      *slog.Logger
+	svc      *consulta.Service
+	tokenKey string
 }
 
-func NewServer(log *slog.Logger, svc *consulta.Service) *Server {
-	return &Server{log: log, svc: svc}
+func NewServer(log *slog.Logger, svc *consulta.Service, tokenKey string) *Server {
+	return &Server{log: log, svc: svc, tokenKey: tokenKey}
 }
 
 func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
-	mux.HandleFunc("POST /api/v1/consultas", s.handleConsulta)
-	mux.HandleFunc("POST /api/v1/sessao/reconectar", s.handleReconectar)
+	mux.HandleFunc("POST /api/detran/consultas", s.handleConsulta)
+	mux.HandleFunc("POST /api/detran/sessao/reconectar", s.handleReconectar)
+	mux.HandleFunc("POST /api/detran/sessao/token", s.handleDefinirToken)
+	mux.HandleFunc("GET /api/detran/sessao", s.handleStatusSessao)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -82,9 +86,8 @@ func (s *Server) handleConsulta(w http.ResponseWriter, r *http.Request) {
 	resp := s.svc.Executar(ctx, jobID, req)
 	status := http.StatusOK
 	if resp.Status == model.StatusErro {
-		status = http.StatusBadGateway // falha ao falar com o portal
+		status = http.StatusBadGateway
 		if temEtapa(resp.Erros, "reconexao") {
-			// Sessão gov.br expirou: 503 sinaliza "indisponível até reconectar".
 			status = http.StatusServiceUnavailable
 		}
 	}
@@ -106,6 +109,54 @@ func (s *Server) handleReconectar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "reconectado"})
+}
+
+func (s *Server) handleDefinirToken(w http.ResponseWriter, r *http.Request) {
+	if s.svc == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{
+			"status": "erro", "mensagem": "portal não configurado (LOGIN_MODE=token)",
+		})
+		return
+	}
+	if s.tokenKey == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Api-Key")), []byte(s.tokenKey)) != 1 {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{
+			"status": "erro", "mensagem": "X-Api-Key inválida",
+		})
+		return
+	}
+
+	var body struct {
+		Bearer string `json:"bearer"`
+		UserID string `json:"userId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Bearer == "" || body.UserID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"status": "erro", "mensagem": "informe bearer e userId",
+		})
+		return
+	}
+	if err := s.svc.DefinirToken(body.Bearer, body.UserID); err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]string{
+			"status": "erro", "mensagem": err.Error(),
+		})
+		return
+	}
+	s.log.Info("token de sessão atualizado via endpoint")
+	writeJSON(w, http.StatusOK, map[string]string{"status": "token atualizado"})
+}
+
+func (s *Server) handleStatusSessao(w http.ResponseWriter, _ *http.Request) {
+	if s.svc == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"autenticado": false, "modo": "desabilitado"})
+		return
+	}
+	autenticado, expiraEm, ok := s.svc.StatusSessao()
+	resp := map[string]any{"autenticado": autenticado, "reportaStatus": ok}
+	if !expiraEm.IsZero() {
+		resp["expiraEm"] = expiraEm.UTC()
+		resp["expiraEmSegundos"] = int(time.Until(expiraEm).Seconds())
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func temEtapa(erros []model.EtapaErro, etapa string) bool {

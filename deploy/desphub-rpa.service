@@ -1,0 +1,31 @@
+# Serviço systemd do microsserviço DespHub RPA.
+#
+# Instalar na VPS:
+#   sudo cp desphub-rpa.service /etc/systemd/system/
+#   sudo cp desphub-rpa.env    /etc/desphub-rpa.env   # ajuste os valores
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now desphub-rpa
+# Ver logs:
+#   journalctl -u desphub-rpa -f
+[Unit]
+Description=DespHub RPA (consulta veicular DETRAN-RS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Usuário dedicado sem privilégios (crie com: sudo useradd -r -s /usr/sbin/nologin desphub)
+User=desphub
+Group=desphub
+EnvironmentFile=/etc/desphub-rpa.env
+ExecStart=/usr/local/bin/desphub-rpa
+Restart=on-failure
+RestartSec=3
+# Endurecimento básico
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

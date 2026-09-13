@@ -34,13 +34,21 @@ func main() {
 
 	var svc *consulta.Service
 	var sess *browser.Session
-	if cfg.LoginMode == "manual" {
+	switch cfg.LoginMode {
+	case "token":
+		portal := detranrs.NewTokenPortal(cfg.DetranRSURL)
+		svc = consulta.NewService(portal, log, cfg.AnonimizarPII)
+		if cfg.SessaoTokenAPIKey == "" {
+			log.Warn("LOGIN_MODE=token sem SESSAO_TOKEN_APIKEY: endpoint de token ficará SEM proteção")
+		}
+		log.Info("portal DETRAN-RS em modo TOKEN (injeção externa via POST /api/detran/sessao/token)")
+	case "manual":
 		s, err := browser.NewRemoteSession(cfg.ChromeDebugURL, browser.Options{
 			NavTimeout:   cfg.NavTimeout,
 			PageLoadWait: cfg.PageLoadWait,
 		}, log)
 		if err != nil {
-			log.Error("não foi possível conectar ao Chrome de depuração; /api/v1/consultas responderá 501",
+			log.Error("não foi possível conectar ao Chrome de depuração; /api/detran/consultas responderá 501",
 				"chromeDebugURL", cfg.ChromeDebugURL, "erro", err.Error())
 		} else {
 			sess = s
@@ -49,12 +57,12 @@ func main() {
 			log.Info("portal DETRAN-RS em modo LOGIN MANUAL (attach ao Chrome do operador)",
 				"chromeDebugURL", cfg.ChromeDebugURL)
 		}
-	} else {
-		log.Warn("LOGIN_MODE não é 'manual': /api/v1/consultas responderá 501")
+	default:
+		log.Warn("LOGIN_MODE vazio: defina 'token' (VPS) ou 'manual' (local); consultas responderão 501")
 	}
 
 	mux := http.NewServeMux()
-	api.NewServer(log, svc).Routes(mux)
+	api.NewServer(log, svc, cfg.SessaoTokenAPIKey).Routes(mux)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

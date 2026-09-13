@@ -47,7 +47,6 @@ func (s *Service) Executar(ctx context.Context, jobID string, req model.Consulta
 		return base
 	}
 
-	// Preserva os metadados do orquestrador (jobId/timestamp) sobre o parse.
 	resp.JobID = jobID
 	resp.ColetadoEm = base.ColetadoEm
 	if resp.Fonte == "" {
@@ -58,7 +57,6 @@ func (s *Service) Executar(ctx context.Context, jobID string, req model.Consulta
 	}
 	resp.Status = classificar(resp)
 
-	// Política de saída: anonimiza PII quando ligado (LGPD).
 	if s.anonimizar {
 		pii.Anonimizar(resp)
 	}
@@ -76,7 +74,30 @@ func (s *Service) Reconectar(ctx context.Context) error {
 	return errors.New("portal não suporta reconexão manual")
 }
 
-// classificar decide SUCESSO/PARCIAL com base no que foi extraído.
+type TokenSetter interface {
+	SetToken(bearer, userID string)
+}
+
+type StatusProvider interface {
+	Status() (autenticado bool, expiraEm time.Time)
+}
+
+func (s *Service) DefinirToken(bearer, userID string) error {
+	if ts, ok := s.portal.(TokenSetter); ok {
+		ts.SetToken(bearer, userID)
+		return nil
+	}
+	return errors.New("portal não aceita injeção de token (use LOGIN_MODE=token)")
+}
+
+func (s *Service) StatusSessao() (autenticado bool, expiraEm time.Time, ok bool) {
+	if sp, ok2 := s.portal.(StatusProvider); ok2 {
+		a, e := sp.Status()
+		return a, e, true
+	}
+	return false, time.Time{}, false
+}
+
 func classificar(r *model.ConsultaResponse) model.Status {
 	if r.Veiculo == nil || r.Veiculo.MarcaModelo == "" {
 		return model.StatusParcial

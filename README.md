@@ -49,7 +49,7 @@ curl -s localhost:8080/health
 Contrato (ainda retorna 501 até a Fase 1):
 
 ```bash
-curl -s -X POST localhost:8080/api/v1/consultas \
+curl -s -X POST localhost:8080/api/detran/consultas \
   -H 'content-type: application/json' \
   -d '{"placa":"ABC1D23","renavam":"00123456789","tipos":["DADOS_CADASTRAIS"]}'
 ```

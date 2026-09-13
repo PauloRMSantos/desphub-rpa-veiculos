@@ -33,7 +33,6 @@ func main() {
 	)
 
 	var svc *consulta.Service
-	var sess *browser.Session
 	switch cfg.LoginMode {
 	case "token":
 		portal := detranrs.NewTokenPortal(cfg.DetranRSURL)
@@ -43,20 +42,13 @@ func main() {
 		}
 		log.Info("portal DETRAN-RS em modo TOKEN (injeção externa via POST /api/detran/sessao/token)")
 	case "manual":
-		s, err := browser.NewRemoteSession(cfg.ChromeDebugURL, browser.Options{
+		portal := detranrs.NewSessionPortal(cfg.ChromeDebugURL, browser.Options{
 			NavTimeout:   cfg.NavTimeout,
 			PageLoadWait: cfg.PageLoadWait,
-		}, log)
-		if err != nil {
-			log.Error("não foi possível conectar ao Chrome de depuração; /api/detran/consultas responderá 501",
-				"chromeDebugURL", cfg.ChromeDebugURL, "erro", err.Error())
-		} else {
-			sess = s
-			portal := detranrs.NewSessionPortal(sess, cfg.DetranRSURL, log)
-			svc = consulta.NewService(portal, log, cfg.AnonimizarPII)
-			log.Info("portal DETRAN-RS em modo LOGIN MANUAL (attach ao Chrome do operador)",
-				"chromeDebugURL", cfg.ChromeDebugURL)
-		}
+		}, cfg.DetranRSURL, log)
+		svc = consulta.NewService(portal, log, cfg.AnonimizarPII)
+		log.Info("portal DETRAN-RS em modo LOGIN MANUAL (reconecta ao Chrome por login)",
+			"chromeDebugURL", cfg.ChromeDebugURL)
 	default:
 		log.Warn("LOGIN_MODE vazio: defina 'token' (VPS) ou 'manual' (local); consultas responderão 501")
 	}
@@ -83,9 +75,6 @@ func main() {
 	<-stop
 
 	log.Info("encerrando serviço...")
-	if sess != nil {
-		sess.Close()
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

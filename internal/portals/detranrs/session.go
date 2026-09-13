@@ -13,19 +13,21 @@ import (
 )
 
 type SessionPortal struct {
-	sess   *browser.Session
-	client *Client
-	log    *slog.Logger
+	debugURL string          
+	navOpts  browser.Options 
+	client   *Client
+	log      *slog.Logger
 
 	mu     sync.Mutex
 	authed bool
 }
 
-func NewSessionPortal(sess *browser.Session, baseURL string, log *slog.Logger) *SessionPortal {
+func NewSessionPortal(debugURL string, navOpts browser.Options, baseURL string, log *slog.Logger) *SessionPortal {
 	return &SessionPortal{
-		sess:   sess,
-		client: NewClient(baseURL),
-		log:    log,
+		debugURL: debugURL,
+		navOpts:  navOpts,
+		client:   NewClient(baseURL),
+		log:      log,
 	}
 }
 
@@ -74,7 +76,14 @@ func (p *SessionPortal) refreshSilencioso(ctx context.Context) error {
 }
 
 func (p *SessionPortal) loginComTimeout(ctx context.Context, timeout time.Duration) error {
-	auth, err := Login(ctx, p.sess, p.log, timeout)
+	sess, err := browser.NewRemoteSession(p.debugURL, p.navOpts, p.log)
+	if err != nil {
+		p.authed = false
+		return fmt.Errorf("conectar ao Chrome (%s): %w", p.debugURL, err)
+	}
+	defer sess.Close()
+
+	auth, err := Login(ctx, sess, p.log, timeout)
 	if err != nil {
 		p.authed = false
 		return err

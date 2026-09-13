@@ -31,55 +31,55 @@ func NewSessionPortal(debugURL string, navOpts browser.Options, baseURL string, 
 	}
 }
 
-func (p *SessionPortal) Nome() string { return "DETRAN-RS" }
+func (p *SessionPortal) Name() string { return "DETRAN-RS" }
 
-func (p *SessionPortal) Consultar(ctx context.Context, placa, renavam string) (*model.ConsultaResponse, error) {
-	if err := p.garantirLogin(ctx, false); err != nil {
+func (p *SessionPortal) Query(ctx context.Context, plate, renavam string) (*model.QueryResponse, error) {
+	if err := p.ensureLogin(ctx, false); err != nil {
 		return nil, err
 	}
 
-	resp, err := p.client.Consultar(ctx, placa, renavam)
-	if errors.Is(err, ErrSessaoExpirada) {
-		p.log.Info("sessão expirada; tentando refresh silencioso")
-		if err := p.refreshSilencioso(ctx); err != nil {
+	resp, err := p.client.Query(ctx, plate, renavam)
+	if errors.Is(err, ErrSessionExpired) {
+		p.log.Info("session expired; trying silent refresh")
+		if err := p.silentRefresh(ctx); err != nil {
 			return nil, err
 		}
-		resp, err = p.client.Consultar(ctx, placa, renavam)
+		resp, err = p.client.Query(ctx, plate, renavam)
 	}
 	return resp, err
 }
 
-func (p *SessionPortal) Reconectar(ctx context.Context) error {
+func (p *SessionPortal) Reconnect(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.authed = false
-	return p.loginComTimeout(ctx, LoginManualTimeout)
+	return p.loginWithTimeout(ctx, LoginManualTimeout)
 }
 
-func (p *SessionPortal) garantirLogin(ctx context.Context, forcar bool) error {
+func (p *SessionPortal) ensureLogin(ctx context.Context, force bool) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.authed && !forcar {
+	if p.authed && !force {
 		return nil
 	}
-	return p.loginComTimeout(ctx, LoginManualTimeout)
+	return p.loginWithTimeout(ctx, LoginManualTimeout)
 }
 
-func (p *SessionPortal) refreshSilencioso(ctx context.Context) error {
+func (p *SessionPortal) silentRefresh(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if err := p.loginComTimeout(ctx, LoginSilentTimeout); err != nil {
-		p.log.Warn("refresh silencioso falhou; requer reconexão manual", "erro", err.Error())
-		return fmt.Errorf("%w (detalhe: %v)", model.ErrReconexaoNecessaria, err)
+	if err := p.loginWithTimeout(ctx, LoginSilentTimeout); err != nil {
+		p.log.Warn("silent refresh failed; manual reconnect required", "error", err.Error())
+		return fmt.Errorf("%w (detail: %v)", model.ErrReconnectRequired, err)
 	}
 	return nil
 }
 
-func (p *SessionPortal) loginComTimeout(ctx context.Context, timeout time.Duration) error {
+func (p *SessionPortal) loginWithTimeout(ctx context.Context, timeout time.Duration) error {
 	sess, err := browser.NewRemoteSession(p.debugURL, p.navOpts, p.log)
 	if err != nil {
 		p.authed = false
-		return fmt.Errorf("conectar ao Chrome (%s): %w", p.debugURL, err)
+		return fmt.Errorf("connecting to Chrome (%s): %w", p.debugURL, err)
 	}
 	defer sess.Close()
 

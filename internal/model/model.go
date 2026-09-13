@@ -5,103 +5,104 @@ import (
 	"time"
 )
 
-var ErrReconexaoNecessaria = errors.New("sessão do portal expirada — reconecte o gov.br")
+var ErrReconnectRequired = errors.New("portal session expired — reconnect gov.br")
 
-type TipoConsulta string
+type QueryType string
 
 const (
-	TipoDadosCadastrais TipoConsulta = "DADOS_CADASTRAIS"
-	TipoDebitos         TipoConsulta = "DEBITOS"
-	TipoRestricoes      TipoConsulta = "RESTRICOES"
-	TipoLicenciamento   TipoConsulta = "LICENCIAMENTO"
+	QueryRegistration QueryType = "REGISTRATION"
+	QueryDebts        QueryType = "DEBTS"
+	QueryRestrictions QueryType = "RESTRICTIONS"
+	QueryLicensing    QueryType = "LICENSING"
 )
 
 type Status string
 
 const (
-	StatusSucesso Status = "SUCESSO"
-	StatusParcial Status = "PARCIAL"
-	StatusErro    Status = "ERRO"
+	StatusSuccess Status = "SUCCESS"
+	StatusPartial Status = "PARTIAL"
+	StatusError   Status = "ERROR"
 )
 
-type Credenciais struct {
-	Usuario string `json:"usuario"`
-	Senha   string `json:"senha"`
+type Credentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
-type ConsultaRequest struct {
-	Placa       string         `json:"placa"`
-	Renavam     string         `json:"renavam"`
-	Chassi      string         `json:"chassi,omitempty"`
-	Tipos       []TipoConsulta `json:"tipos"`
-	Credenciais *Credenciais   `json:"credenciais,omitempty"`
+type QueryRequest struct {
+	Plate       string       `json:"plate"`
+	Renavam     string       `json:"renavam"`
+	Chassis     string       `json:"chassis,omitempty"`
+	Types       []QueryType  `json:"types"`
+	Credentials *Credentials `json:"credentials,omitempty"`
 }
 
-type Veiculo struct {
-	Placa           string `json:"placa,omitempty"`
+type Vehicle struct {
+	Plate           string `json:"plate,omitempty"`
 	Renavam         string `json:"renavam,omitempty"`
-	Chassi          string `json:"chassi,omitempty"`
-	MarcaModelo     string `json:"marcaModelo,omitempty"`
-	AnoFabricacao   int    `json:"anoFabricacao,omitempty"`
-	AnoModelo       int    `json:"anoModelo,omitempty"`
-	Cor             string `json:"cor,omitempty"`
-	Tipo            string `json:"tipo,omitempty"`     // ex.: "Automóvel"
-	Especie         string `json:"especie,omitempty"`  // ex.: "Passageiro"
-	Categoria       string `json:"categoria,omitempty"`
-	Municipio       string `json:"municipio,omitempty"` // município de registro
-	UfPlaca         string `json:"ufPlaca,omitempty"`
-	Combustivel     string `json:"combustivel,omitempty"`
-	SituacaoRenavam string `json:"situacaoRenavam,omitempty"` // ex.: "Em circulação"
-	CpfProprietario string `json:"cpfProprietario,omitempty"`
+	Chassis         string `json:"chassis,omitempty"`
+	MakeModel       string `json:"makeModel,omitempty"`
+	ManufactureYear int    `json:"manufactureYear,omitempty"`
+	ModelYear       int    `json:"modelYear,omitempty"`
+	Color           string `json:"color,omitempty"`
+	Type            string `json:"type,omitempty"`    // e.g. "Automóvel" (portal value)
+	Species         string `json:"species,omitempty"` // e.g. "Passageiro" (portal value)
+	Category        string `json:"category,omitempty"`
+	City            string `json:"city,omitempty"` 
+	PlateState      string `json:"plateState,omitempty"`
+	Fuel            string `json:"fuel,omitempty"`
+	RenavamStatus   string `json:"renavamStatus,omitempty"`
+	OwnerCPF string `json:"ownerCpf,omitempty"`
 }
 
-type Licenciamento struct {
-	Exercicio         string `json:"exercicio,omitempty"`
-	SituacaoDocumento string `json:"situacaoDocumento,omitempty"`
-	Documento         string `json:"documento,omitempty"` // ex.: "CRLV"
-	DataVencimento    string `json:"dataVencimento,omitempty"`
+// Licensing summarizes the CRLV / current-year licensing status.
+type Licensing struct {
+	Year           string `json:"year,omitempty"`
+	DocumentStatus string `json:"documentStatus,omitempty"`
+	Document       string `json:"document,omitempty"` // e.g. "CRLV"
+	DueDate        string `json:"dueDate,omitempty"`
 }
 
-type Restricao struct {
-	Tipo      string `json:"tipo"`
-	Descricao string `json:"descricao"`
+type Restriction struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
 }
 
-type Debito struct {
-	Tipo       string `json:"tipo"`
-	Exercicio  int    `json:"exercicio,omitempty"`
-	Valor      string `json:"valor"` // decimal como string, ex.: "1234.56"
-	Vencimento string `json:"vencimento,omitempty"`
+type Debt struct {
+	Type    string `json:"type"`
+	Year    int    `json:"year,omitempty"`
+	Amount  string `json:"amount"` // decimal string, e.g. "1234.56"
+	DueDate string `json:"dueDate,omitempty"`
 }
 
-type ResumoInfracao struct {
-	Quantidade int    `json:"quantidade"`
-	Valor      string `json:"valor"`
+type ViolationSummary struct {
+	Count  int    `json:"count"`
+	Amount string `json:"amount"`
 }
 
-type Infracoes struct {
-	AVencer               ResumoInfracao `json:"aVencer"`
-	Vencidas              ResumoInfracao `json:"vencidas"`
-	Suspensas             ResumoInfracao `json:"suspensas"`
-	AguardandoPrazoDefesa ResumoInfracao `json:"aguardandoPrazoDefesa"`
-	AguardandoJulgamento  ResumoInfracao `json:"aguardandoJulgamento"`
+type Violations struct {
+	Upcoming         ViolationSummary `json:"upcoming"`
+	Overdue          ViolationSummary `json:"overdue"`
+	Suspended        ViolationSummary `json:"suspended"`
+	AwaitingDefense  ViolationSummary `json:"awaitingDefense"`
+	AwaitingJudgment ViolationSummary `json:"awaitingJudgment"`
 }
 
-type EtapaErro struct {
-	Etapa    string `json:"etapa"`
-	Mensagem string `json:"mensagem"`
+type StepError struct {
+	Step    string `json:"step"`
+	Message string `json:"message"`
 }
 
-type ConsultaResponse struct {
-	JobID      string      `json:"jobId"`
-	Placa      string      `json:"placa"`
-	Fonte      string      `json:"fonte"`
-	ColetadoEm time.Time   `json:"coletadoEm"`
-	Veiculo       *Veiculo       `json:"veiculo,omitempty"`
-	Licenciamento *Licenciamento `json:"licenciamento,omitempty"`
-	Infracoes     *Infracoes     `json:"infracoes,omitempty"`
-	Restricoes    []Restricao    `json:"restricoes,omitempty"`
-	Debitos       []Debito       `json:"debitos,omitempty"`
-	Status        Status         `json:"status"`
-	Erros         []EtapaErro    `json:"erros,omitempty"`
+type QueryResponse struct {
+	JobID       string       `json:"jobId"`
+	Plate       string       `json:"plate"`
+	Source      string       `json:"source"`
+	CollectedAt time.Time    `json:"collectedAt"`
+	Vehicle     *Vehicle     `json:"vehicle,omitempty"`
+	Licensing   *Licensing   `json:"licensing,omitempty"`
+	Violations  *Violations  `json:"violations,omitempty"`
+	Restrictions []Restriction `json:"restrictions,omitempty"`
+	Debts       []Debt       `json:"debts,omitempty"`
+	Status      Status       `json:"status"`
+	Errors      []StepError  `json:"errors,omitempty"`
 }

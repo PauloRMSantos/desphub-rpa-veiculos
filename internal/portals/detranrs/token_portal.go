@@ -15,55 +15,55 @@ import (
 type TokenPortal struct {
 	client *Client
 
-	mu       sync.RWMutex
-	authed   bool
-	expiraEm time.Time 
+	mu        sync.RWMutex
+	authed    bool
+	expiresAt time.Time 
 }
 
 func NewTokenPortal(baseURL string) *TokenPortal {
 	return &TokenPortal{client: NewClient(baseURL)}
 }
 
-func (p *TokenPortal) Nome() string { return "DETRAN-RS" }
+func (p *TokenPortal) Name() string { return "DETRAN-RS" }
 
 func (p *TokenPortal) SetToken(bearer, userID string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.client.SetAuth(Auth{Bearer: bearer, UserID: userID})
 	p.authed = bearer != "" && userID != ""
-	p.expiraEm = jwtExpiracao(bearer)
+	p.expiresAt = jwtExpiry(bearer)
 }
 
-func (p *TokenPortal) Status() (authed bool, expiraEm time.Time) {
+func (p *TokenPortal) Status() (authed bool, expiresAt time.Time) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.authed, p.expiraEm
+	return p.authed, p.expiresAt
 }
 
-func (p *TokenPortal) Consultar(ctx context.Context, placa, renavam string) (*model.ConsultaResponse, error) {
+func (p *TokenPortal) Query(ctx context.Context, plate, renavam string) (*model.QueryResponse, error) {
 	p.mu.RLock()
 	authed := p.authed
 	p.mu.RUnlock()
 	if !authed {
-		return nil, model.ErrReconexaoNecessaria
+		return nil, model.ErrReconnectRequired
 	}
 
-	resp, err := p.client.Consultar(ctx, placa, renavam)
-	if errors.Is(err, ErrSessaoExpirada) {
+	resp, err := p.client.Query(ctx, plate, renavam)
+	if errors.Is(err, ErrSessionExpired) {
 		p.mu.Lock()
 		p.authed = false
 		p.mu.Unlock()
-		return nil, model.ErrReconexaoNecessaria
+		return nil, model.ErrReconnectRequired
 	}
 	return resp, err
 }
 
-func jwtExpiracao(token string) time.Time {
-	partes := strings.Split(token, ".")
-	if len(partes) < 2 {
+func jwtExpiry(token string) time.Time {
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
 		return time.Time{}
 	}
-	payload, err := base64.RawURLEncoding.DecodeString(partes[1])
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return time.Time{}
 	}

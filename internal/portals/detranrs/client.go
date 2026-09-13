@@ -12,7 +12,7 @@ import (
 	"github.com/paulorosantos/desphub-rpa/internal/model"
 )
 
-var ErrSessaoExpirada = errors.New("detranrs: sessão inválida/expirada")
+var ErrSessionExpired = errors.New("detranrs: session invalid/expired")
 
 const (
 	DefaultBaseURL = "https://pcsdetran.procergs.com.br"
@@ -22,7 +22,7 @@ const (
 
 type Auth struct {
 	Bearer string // Authorization: Bearer <token>
-	UserID string // X-User-Id (base64 do CPF do despachante)
+	UserID string 
 }
 
 type Client struct {
@@ -51,52 +51,52 @@ func (c *Client) SetUserAgent(ua string) {
 	}
 }
 
-func (c *Client) Nome() string { return "DETRAN-RS" }
+func (c *Client) Name() string { return "DETRAN-RS" }
 
-func (c *Client) Consultar(ctx context.Context, placa, renavam string) (*model.ConsultaResponse, error) {
-	raw, err := c.ConsultarVeiculo(ctx, placa, renavam)
+func (c *Client) Query(ctx context.Context, plate, renavam string) (*model.QueryResponse, error) {
+	raw, err := c.queryVehicle(ctx, plate, renavam)
 	if err != nil {
 		return nil, err
 	}
-	return ParseVeiculo(raw)
+	return ParseVehicle(raw)
 }
 
-const maxTentativas = 3
+const maxAttempts = 3
 
-func (c *Client) ConsultarVeiculo(ctx context.Context, placa, renavam string) ([]byte, error) {
+func (c *Client) queryVehicle(ctx context.Context, plate, renavam string) ([]byte, error) {
 	if c.auth.Bearer == "" || c.auth.UserID == "" {
-		return nil, fmt.Errorf("detranrs: credenciais ausentes (Bearer/X-User-Id) — faça o login primeiro")
+		return nil, fmt.Errorf("detranrs: missing credentials (Bearer/X-User-Id) — log in first")
 	}
 
-	endpoint := fmt.Sprintf("%s/pcsdetran/rest/veiculos/%s/", c.baseURL, url.PathEscape(placa))
+	endpoint := fmt.Sprintf("%s/pcsdetran/rest/veiculos/%s/", c.baseURL, url.PathEscape(plate))
 	q := url.Values{}
 	q.Set("renavam", renavam)
 	q.Set("contabiliza", "false")
 	endpoint += "?" + q.Encode()
 
 	var lastErr error
-	for tentativa := 1; tentativa <= maxTentativas; tentativa++ {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		body, status, err := c.doGet(ctx, endpoint)
 		switch {
 		case err != nil:
 			lastErr = err
 		case status == http.StatusUnauthorized || status == http.StatusForbidden:
-			return nil, fmt.Errorf("%w (HTTP %d)", ErrSessaoExpirada, status)
+			return nil, fmt.Errorf("%w (HTTP %d)", ErrSessionExpired, status)
 		case status >= 500:
-			lastErr = fmt.Errorf("detranrs: API devolveu HTTP %d", status)
+			lastErr = fmt.Errorf("detranrs: API returned HTTP %d", status)
 		case status != http.StatusOK:
-			return nil, fmt.Errorf("detranrs: API devolveu HTTP %d", status)
+			return nil, fmt.Errorf("detranrs: API returned HTTP %d", status)
 		default:
 			return body, nil
 		}
 
-		if tentativa < maxTentativas {
-			if err := esperarBackoff(ctx, tentativa); err != nil {
+		if attempt < maxAttempts {
+			if err := waitBackoff(ctx, attempt); err != nil {
 				return nil, err
 			}
 		}
 	}
-	return nil, fmt.Errorf("detranrs: falha após %d tentativas: %w", maxTentativas, lastErr)
+	return nil, fmt.Errorf("detranrs: failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
 func (c *Client) doGet(ctx context.Context, endpoint string) ([]byte, int, error) {
@@ -113,19 +113,19 @@ func (c *Client) doGet(ctx context.Context, endpoint string) ([]byte, int, error
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("detranrs: request veículo: %w", err)
+		return nil, 0, fmt.Errorf("detranrs: vehicle request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, resp.StatusCode, fmt.Errorf("detranrs: lendo corpo: %w", err)
+		return nil, resp.StatusCode, fmt.Errorf("detranrs: reading body: %w", err)
 	}
 	return body, resp.StatusCode, nil
 }
 
-func esperarBackoff(ctx context.Context, tentativa int) error {
-	d := time.Duration(200*(1<<(tentativa-1))) * time.Millisecond
+func waitBackoff(ctx context.Context, attempt int) error {
+	d := time.Duration(200*(1<<(attempt-1))) * time.Millisecond
 	select {
 	case <-time.After(d):
 		return nil

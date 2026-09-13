@@ -1,9 +1,9 @@
 //go:build e2e
 
-// Smoke test de integração do chromedp. Roda somente com `-tags e2e` e exige
-// um Chrome/Chromium instalado. Não roda no CI padrão.
+// chromedp integration smoke test. Runs only with `-tags e2e` and requires an
+// installed Chrome/Chromium. Not part of the default CI.
 //
-//	go test -tags e2e ./internal/browser -run TestSmokeAbrePortal -v
+//	go test -tags e2e ./internal/browser -run TestSmokeOpenPortal -v
 package browser
 
 import (
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func TestSmokeAbrePortal(t *testing.T) {
+func TestSmokeOpenPortal(t *testing.T) {
 	url := os.Getenv("SMOKE_URL")
 	if url == "" {
 		url = "https://sso.acesso.gov.br/login"
@@ -34,10 +34,10 @@ func TestSmokeAbrePortal(t *testing.T) {
 
 	html, err := sess.GetHTML(ctx, url)
 	if err != nil {
-		t.Fatalf("GetHTML falhou: %v", err)
+		t.Fatalf("GetHTML failed: %v", err)
 	}
 	if !strings.Contains(strings.ToLower(html), "<html") {
-		t.Fatalf("HTML renderizado parece vazio/ inválido (len=%d)", len(html))
+		t.Fatalf("rendered HTML looks empty/invalid (len=%d)", len(html))
 	}
-	t.Logf("OK: %s renderizou %d bytes de HTML", url, len(html))
+	t.Logf("OK: %s rendered %d bytes of HTML", url, len(html))
 }

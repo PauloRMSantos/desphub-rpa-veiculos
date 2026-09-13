@@ -7,26 +7,26 @@ import (
 )
 
 func TestMaskCPF(t *testing.T) {
-	casos := map[string]string{
+	cases := map[string]string{
 		"74722310025":    "***.223.100-**",
-		"747.223.100-25": "***.223.100-**", // já formatado
+		"747.223.100-25": "***.223.100-**", // already formatted
 		"":               "",
 		"12":             "**",
-		"123456":         "****56", // formato inesperado: só 2 últimos
+		"123456":         "****56", // unexpected format: last 2 only
 	}
-	for in, want := range casos {
+	for in, want := range cases {
 		if got := MaskCPF(in); got != want {
-			t.Errorf("MaskCPF(%q) = %q; quero %q", in, got, want)
+			t.Errorf("MaskCPF(%q) = %q; want %q", in, got, want)
 		}
 	}
 }
 
-func TestAnonimizarSeguroParaNil(t *testing.T) {
-	Anonimizar(nil)                                  // não deve entrar em pânico
-	Anonimizar(&model.ConsultaResponse{})            // Veiculo nil, ok
-	r := &model.ConsultaResponse{Veiculo: &model.Veiculo{CpfProprietario: "74722310025"}}
-	Anonimizar(r)
-	if r.Veiculo.CpfProprietario != "***.223.100-**" {
-		t.Errorf("CPF = %q; quero mascarado", r.Veiculo.CpfProprietario)
+func TestAnonymizeNilSafe(t *testing.T) {
+	Anonymize(nil)                          // must not panic
+	Anonymize(&model.QueryResponse{})       // Vehicle nil, ok
+	r := &model.QueryResponse{Vehicle: &model.Vehicle{OwnerCPF: "74722310025"}}
+	Anonymize(r)
+	if r.Vehicle.OwnerCPF != "***.223.100-**" {
+		t.Errorf("CPF = %q; want masked", r.Vehicle.OwnerCPF)
 	}
 }

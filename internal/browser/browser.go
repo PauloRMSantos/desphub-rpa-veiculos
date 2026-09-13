@@ -14,9 +14,9 @@ import (
 
 type Options struct {
 	Headless     bool
-	ChromePath   string        // vazio = deixa o chromedp autodetectar
-	NavTimeout   time.Duration // timeout por operação de navegação
-	PageLoadWait time.Duration // espera pós-load para render dinâmico
+	ChromePath   string        
+	NavTimeout   time.Duration 
+	PageLoadWait time.Duration 
 }
 type Navigator interface {
 	GetHTML(ctx context.Context, url string) (string, error)
@@ -70,7 +70,7 @@ func NewRemoteSession(debugURL string, opts Options, log *slog.Logger) (*Session
 	}
 	wsURL, err := resolveWSURL(debugURL)
 	if err != nil {
-		return nil, fmt.Errorf("browser: não consegui falar com o Chrome em %s: %w", debugURL, err)
+		return nil, fmt.Errorf("browser: could not reach Chrome at %s: %w", debugURL, err)
 	}
 
 	allocCtx, allocCancel := chromedp.NewRemoteAllocator(context.Background(), wsURL)
@@ -103,7 +103,7 @@ func resolveWSURL(debugURL string) (string, error) {
 		return "", err
 	}
 	if v.WebSocketDebuggerURL == "" {
-		return "", fmt.Errorf("webSocketDebuggerUrl vazio em %s", endpoint)
+		return "", fmt.Errorf("empty webSocketDebuggerUrl at %s", endpoint)
 	}
 	return v.WebSocketDebuggerURL, nil
 }
@@ -128,7 +128,7 @@ func (s *Session) GetHTML(ctx context.Context, url string) (string, error) {
 	}
 
 	if err := chromedp.Run(runCtx, tasks); err != nil {
-		return "", fmt.Errorf("browser: falha ao obter HTML de %s: %w", url, err)
+		return "", fmt.Errorf("browser: failed to get HTML of %s: %w", url, err)
 	}
 	return html, nil
 }

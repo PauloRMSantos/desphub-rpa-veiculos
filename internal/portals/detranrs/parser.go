@@ -9,7 +9,7 @@ import (
 	"github.com/paulorosantos/desphub-rpa/internal/model"
 )
 
-type apiResposta struct {
+type apiResponse struct {
 	Identificacao struct {
 		TemErro             bool   `json:"temErro"`
 		MarcaModelo         string `json:"marcaModelo"`
@@ -33,10 +33,10 @@ type apiResposta struct {
 	} `json:"identificacao"`
 
 	Licenciamento struct {
-		TemErro          bool   `json:"temErro"`
-		Exercicio        string `json:"exercicio"`
+		TemErro           bool   `json:"temErro"`
+		Exercicio         string `json:"exercicio"`
 		SituacaoDocumento string `json:"situacaoDocumento"`
-		DescDocumento    string `json:"descDocumento"`
+		DescDocumento     string `json:"descDocumento"`
 	} `json:"licenciamento"`
 
 	Imposto struct {
@@ -53,8 +53,6 @@ type apiResposta struct {
 	Restricao struct {
 		TemErro    bool `json:"temErro"`
 		Restricoes []struct {
-			// TODO: confirmar campos reais quando houver um veículo com
-			// restrição (veio null no fixture real)
 			Tipo      string `json:"tipo"`
 			Descricao string `json:"descricao"`
 		} `json:"restricoes"`
@@ -68,97 +66,97 @@ type apiResposta struct {
 	} `json:"seguro"`
 
 	Infracao struct {
-		TemErro      bool   `json:"temErro"`
-		QtAgPrazoDef int    `json:"qtAgPrazoDef"`
-		VlAgPrazoDef string `json:"vlAgPrazoDef"`
-		QtAgPrazoJulg int   `json:"qtAgPrazoJulg"`
+		TemErro       bool   `json:"temErro"`
+		QtAgPrazoDef  int    `json:"qtAgPrazoDef"`
+		VlAgPrazoDef  string `json:"vlAgPrazoDef"`
+		QtAgPrazoJulg int    `json:"qtAgPrazoJulg"`
 		VlAgPrazoJulg string `json:"vlAgPrazoJulg"`
-		QtAVencer    int    `json:"qtAVencer"`
-		VlAVencer    string `json:"vlAVencer"`
-		QtSuspensas  int    `json:"qtSuspensas"`
-		VlSuspensas  string `json:"vlSuspensas"`
-		QtVencidas   int    `json:"qtVencidas"`
-		VlVencidas   string `json:"vlVencidas"`
+		QtAVencer     int    `json:"qtAVencer"`
+		VlAVencer     string `json:"vlAVencer"`
+		QtSuspensas   int    `json:"qtSuspensas"`
+		VlSuspensas   string `json:"vlSuspensas"`
+		QtVencidas    int    `json:"qtVencidas"`
+		VlVencidas    string `json:"vlVencidas"`
 	} `json:"infracao"`
 }
 
-func ParseVeiculo(raw []byte) (*model.ConsultaResponse, error) {
-	var r apiResposta
+func ParseVehicle(raw []byte) (*model.QueryResponse, error) {
+	var r apiResponse
 	if err := json.Unmarshal(raw, &r); err != nil {
-		return nil, fmt.Errorf("detranrs: parse resposta: %w", err)
+		return nil, fmt.Errorf("detranrs: parse response: %w", err)
 	}
 
 	id := r.Identificacao
-	resp := &model.ConsultaResponse{
-		Placa: id.Placa,
-		Fonte: "DETRAN-RS",
-		Veiculo: &model.Veiculo{
-			Placa:           id.Placa,
-			Renavam:         renavamStr(id.Renavam),
-			Chassi:          id.Chassi,
-			MarcaModelo:     id.MarcaModelo,
-			AnoFabricacao:   id.AnoFabricacao,
-			AnoModelo:       id.AnoModelo,
-			Cor:             id.Cor,
-			Tipo:            id.Tipo,
-			Especie:         id.Especie,
-			Categoria:       id.Categoria,
-			Municipio:       id.MunicipioRegistro,
-			UfPlaca:         id.UfPlaca,
-			Combustivel:     id.Combustivel,
-			SituacaoRenavam: id.Situacao,
-			CpfProprietario: id.CpfProprietario,
+	resp := &model.QueryResponse{
+		Plate:  id.Placa,
+		Source: "DETRAN-RS",
+		Vehicle: &model.Vehicle{
+			Plate:           id.Placa,
+			Renavam:         renavamString(id.Renavam),
+			Chassis:         id.Chassi,
+			MakeModel:       id.MarcaModelo,
+			ManufactureYear: id.AnoFabricacao,
+			ModelYear:       id.AnoModelo,
+			Color:           id.Cor,
+			Type:            id.Tipo,
+			Species:         id.Especie,
+			Category:        id.Categoria,
+			City:            id.MunicipioRegistro,
+			PlateState:      id.UfPlaca,
+			Fuel:            id.Combustivel,
+			RenavamStatus:   id.Situacao,
+			OwnerCPF:        id.CpfProprietario,
 		},
 	}
 
 	if r.Licenciamento.Exercicio != "" || r.Licenciamento.SituacaoDocumento != "" {
-		resp.Licenciamento = &model.Licenciamento{
-			Exercicio:         r.Licenciamento.Exercicio,
-			SituacaoDocumento: r.Licenciamento.SituacaoDocumento,
-			Documento:         r.Licenciamento.DescDocumento,
-			DataVencimento:    id.DtVencLicenciamento,
+		resp.Licensing = &model.Licensing{
+			Year:           r.Licenciamento.Exercicio,
+			DocumentStatus: r.Licenciamento.SituacaoDocumento,
+			Document:       r.Licenciamento.DescDocumento,
+			DueDate:        id.DtVencLicenciamento,
 		}
 	}
 
 	for _, h := range r.Imposto.Historico {
-		valor := normalizeValorBRL(h.ValorOriginal)
-		if ehIsento(h.Situacao) || valor == "0.00" {
+		amount := normalizeBRLAmount(h.ValorOriginal)
+		if isExempt(h.Situacao) || amount == "0.00" {
 			continue
 		}
-		resp.Debitos = append(resp.Debitos, model.Debito{
-			Tipo:       "IPVA",
-			Exercicio:  atoiSafe(h.Exercicio),
-			Valor:      valor,
-			Vencimento: deref(h.DataVencimento),
+		resp.Debts = append(resp.Debts, model.Debt{
+			Type:    "IPVA",
+			Year:    safeAtoi(h.Exercicio),
+			Amount:  amount,
+			DueDate: deref(h.DataVencimento),
 		})
 	}
 
 	for _, rr := range r.Restricao.Restricoes {
-		resp.Restricoes = append(resp.Restricoes, model.Restricao{
-			Tipo:      rr.Tipo,
-			Descricao: rr.Descricao,
+		resp.Restrictions = append(resp.Restrictions, model.Restriction{
+			Type:        rr.Tipo,
+			Description: rr.Descricao,
 		})
 	}
 
 	if id.Furtado {
-		resp.Restricoes = append(resp.Restricoes, model.Restricao{
-			Tipo:      "ROUBO_FURTO",
-			Descricao: "Veículo com registro de roubo/furto",
+		resp.Restrictions = append(resp.Restrictions, model.Restriction{
+			Type:        "THEFT_ROBBERY",
+			Description: "Vehicle reported stolen/robbed",
 		})
 	}
 	if id.EmDeposito {
-		resp.Restricoes = append(resp.Restricoes, model.Restricao{
-			Tipo:      "EM_DEPOSITO",
-			Descricao: "Veículo em depósito",
+		resp.Restrictions = append(resp.Restrictions, model.Restriction{
+			Type:        "IMPOUNDED",
+			Description: "Vehicle impounded",
 		})
 	}
 
-	if s := r.Seguro; !ehIsento(s.SituacaoExercAtual) {
-		if valor := normalizeValorBRL(s.ValorExercAtual); valor != "0.00" {
-			resp.Debitos = append(resp.Debitos, model.Debito{
-				Tipo:      "DPVAT",
-				Exercicio: atoiSafe(s.ExercicioAtual),
-				Valor:     valor,
+	if s := r.Seguro; !isExempt(s.SituacaoExercAtual) {
+		if amount := normalizeBRLAmount(s.ValorExercAtual); amount != "0.00" {
+			resp.Debts = append(resp.Debts, model.Debt{
+				Type:   "DPVAT",
+				Year:   safeAtoi(s.ExercicioAtual),
+				Amount: amount,
 			})
 		}
 	}
@@ -166,28 +164,27 @@ func ParseVeiculo(raw []byte) (*model.ConsultaResponse, error) {
 	inf := r.Infracao
 	total := inf.QtAVencer + inf.QtVencidas + inf.QtSuspensas + inf.QtAgPrazoDef + inf.QtAgPrazoJulg
 	if total > 0 {
-		resp.Infracoes = &model.Infracoes{
-			AVencer:               model.ResumoInfracao{Quantidade: inf.QtAVencer, Valor: normalizeValorBRL(inf.VlAVencer)},
-			Vencidas:              model.ResumoInfracao{Quantidade: inf.QtVencidas, Valor: normalizeValorBRL(inf.VlVencidas)},
-			Suspensas:             model.ResumoInfracao{Quantidade: inf.QtSuspensas, Valor: normalizeValorBRL(inf.VlSuspensas)},
-			AguardandoPrazoDefesa: model.ResumoInfracao{Quantidade: inf.QtAgPrazoDef, Valor: normalizeValorBRL(inf.VlAgPrazoDef)},
-			AguardandoJulgamento:  model.ResumoInfracao{Quantidade: inf.QtAgPrazoJulg, Valor: normalizeValorBRL(inf.VlAgPrazoJulg)},
+		resp.Violations = &model.Violations{
+			Upcoming:         model.ViolationSummary{Count: inf.QtAVencer, Amount: normalizeBRLAmount(inf.VlAVencer)},
+			Overdue:          model.ViolationSummary{Count: inf.QtVencidas, Amount: normalizeBRLAmount(inf.VlVencidas)},
+			Suspended:        model.ViolationSummary{Count: inf.QtSuspensas, Amount: normalizeBRLAmount(inf.VlSuspensas)},
+			AwaitingDefense:  model.ViolationSummary{Count: inf.QtAgPrazoDef, Amount: normalizeBRLAmount(inf.VlAgPrazoDef)},
+			AwaitingJudgment: model.ViolationSummary{Count: inf.QtAgPrazoJulg, Amount: normalizeBRLAmount(inf.VlAgPrazoJulg)},
 		}
 	}
 
 	return resp, nil
 }
 
-
-func normalizeValorBRL(s string) string {
+func normalizeBRLAmount(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "0.00"
 	}
 	s = strings.ReplaceAll(s, "R$", "")
 	s = strings.TrimSpace(s)
-	s = strings.ReplaceAll(s, ".", "") // separador de milhar
-	s = strings.ReplaceAll(s, ",", ".") // separador decimal
+	s = strings.ReplaceAll(s, ".", "")
+	s = strings.ReplaceAll(s, ",", ".")
 	s = strings.ReplaceAll(s, " ", "")
 	if s == "" {
 		return "0.00"
@@ -198,19 +195,19 @@ func normalizeValorBRL(s string) string {
 	return s
 }
 
-func ehIsento(situacao string) bool {
-	s := strings.ToLower(strings.TrimSpace(situacao))
+func isExempt(status string) bool {
+	s := strings.ToLower(strings.TrimSpace(status))
 	return s == "isento" || s == "não devido" || s == "nao devido"
 }
 
-func renavamStr(r int64) string {
+func renavamString(r int64) string {
 	if r == 0 {
 		return ""
 	}
 	return strconv.FormatInt(r, 10)
 }
 
-func atoiSafe(s string) int {
+func safeAtoi(s string) int {
 	n, err := strconv.Atoi(strings.TrimSpace(s))
 	if err != nil {
 		return 0

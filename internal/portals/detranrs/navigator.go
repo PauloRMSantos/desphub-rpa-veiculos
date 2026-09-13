@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	ConsultaURL  = "https://pcsdetran.rs.gov.br/consulta-veiculo?contabiliza=true"
-	apiHostMatch = "procergs.com.br"
+	VehicleQueryURL = "https://pcsdetran.rs.gov.br/consulta-veiculo?contabiliza=true"
+	apiHostMatch    = "procergs.com.br"
 
 	LoginManualTimeout = 5 * time.Minute
 	LoginSilentTimeout = 25 * time.Second
@@ -41,15 +41,15 @@ func Login(ctx context.Context, sess *browser.Session, log *slog.Logger, timeout
 		if !ok || !strings.Contains(e.Request.URL, apiHostMatch) {
 			return
 		}
-		raw := headerValor(e.Request.Headers, "authorization")
+		raw := headerValue(e.Request.Headers, "authorization")
 		token := strings.TrimSpace(strings.TrimPrefix(raw, "Bearer "))
-		if !pareceJWT(token) {
-			log.Debug("chamada à procergs sem token válido ainda", "temAuthHeader", raw != "")
+		if !looksLikeJWT(token) {
+			log.Debug("procergs call without a valid token yet", "hasAuthHeader", raw != "")
 			return
 		}
 		mu.Lock()
 		captured.Bearer = token
-		if uid := headerValor(e.Request.Headers, "x-user-id"); uid != "" {
+		if uid := headerValue(e.Request.Headers, "x-user-id"); uid != "" {
 			captured.UserID = uid
 		}
 		mu.Unlock()
@@ -69,15 +69,14 @@ func Login(ctx context.Context, sess *browser.Session, log *slog.Logger, timeout
 	err := chromedp.Run(runCtx,
 		network.Enable(),
 		chromedp.ActionFunc(func(c context.Context) error {
-			if e := chromedp.Navigate(ConsultaURL).Do(c); e != nil {
-				log.Warn("navegação inicial retornou erro (provável redirect ao /login); seguindo", "erro", e.Error())
+			if e := chromedp.Navigate(VehicleQueryURL).Do(c); e != nil {
+				log.Warn("initial navigation returned an error (likely /login redirect); continuing", "error", e.Error())
 			}
-			log.Info("navegador aberto na página de login do DETRAN-RS")
+			log.Info("browser opened at the DETRAN-RS login page")
 			log.Info("=======================================================")
-			log.Info(">> AÇÃO NECESSÁRIA: faça o LOGIN no gov.br na janela do Chrome que abriu.")
-			log.Info(">> O RPA assume automaticamente assim que você concluir o login.")
-			log.Info("=======================================================",
-				"aguardandoAte", timeout.String())
+			log.Info(">> ACTION REQUIRED: log in to gov.br in the Chrome window that opened.")
+			log.Info(">> The RPA takes over automatically once you finish the login.")
+			log.Info("=======================================================", "waitingUpTo", timeout.String())
 			return nil
 		}),
 		chromedp.ActionFunc(func(c context.Context) error {
@@ -85,36 +84,36 @@ func Login(ctx context.Context, sess *browser.Session, log *slog.Logger, timeout
 			case <-done:
 				return nil
 			case <-time.After(timeout):
-				return fmt.Errorf("tempo esgotado aguardando captura do token (%s)", timeout)
+				return fmt.Errorf("timed out waiting for token capture (%s)", timeout)
 			case <-c.Done():
 				return c.Err()
 			}
 		}),
 	)
 	if err != nil {
-		return Auth{}, fmt.Errorf("detranrs: login manual: %w", err)
+		return Auth{}, fmt.Errorf("detranrs: manual login: %w", err)
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
 	if captured.UserID == "" {
-		log.Warn("token capturado, mas X-User-Id não apareceu — confirmar no fluxo real")
+		log.Warn("token captured, but X-User-Id did not appear — confirm in the real flow")
 	}
-	log.Info("login detectado; credenciais de sessão capturadas com sucesso")
+	log.Info("login detected; session credentials captured successfully")
 	return captured, nil
 }
 
-func pareceJWT(token string) bool {
+func looksLikeJWT(token string) bool {
 	if len(token) < 20 {
 		return false
 	}
 	return strings.Count(token, ".") >= 2 && strings.HasPrefix(token, "ey")
 }
 
-func headerValor(h network.Headers, chave string) string {
-	chave = strings.ToLower(chave)
+func headerValue(h network.Headers, key string) string {
+	key = strings.ToLower(key)
 	for k, v := range h {
-		if strings.ToLower(k) == chave {
+		if strings.ToLower(k) == key {
 			if s, ok := v.(string); ok {
 				return s
 			}

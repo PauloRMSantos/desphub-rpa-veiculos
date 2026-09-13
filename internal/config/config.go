@@ -15,39 +15,38 @@ type Config struct {
 	NavTimeout   time.Duration
 	PageLoadWait time.Duration
 
-	GovBrLoginURL string // URL de login do gov.br
-	DetranRSURL   string // URL base da API DETRAN/RS (vazio = DefaultBaseURL)
+	GovBrLoginURL string 
+	DetranRSURL   string 
 
 	LoginMode string
 
 	ChromeDebugURL string
 
-	// SessaoTokenAPIKey protege POST /api/detran/sessao/token (LOGIN_MODE=token).
-	SessaoTokenAPIKey string
+	SessionTokenAPIKey string
 
 	LogLevel string // debug | info | warn | error
 
-	AnonimizarPII bool
+	AnonymizePII bool
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Port:              getEnv("PORT", "8080"),
-		Headless:          getEnvBool("HEADLESS", true),
-		ChromePath:        getEnv("CHROME_PATH", ""),
-		NavTimeout:        getEnvDuration("NAV_TIMEOUT", 45*time.Second),
-		PageLoadWait:      getEnvDuration("PAGE_LOAD_WAIT", 2*time.Second),
-		GovBrLoginURL:     getEnv("GOVBR_LOGIN_URL", "https://sso.acesso.gov.br/login"),
-		DetranRSURL:       getEnv("DETRANRS_URL", ""),
-		LoginMode:         getEnv("LOGIN_MODE", ""),
-		ChromeDebugURL:    getEnv("CHROME_DEBUG_URL", "http://localhost:9222"),
-		SessaoTokenAPIKey: getEnv("SESSAO_TOKEN_APIKEY", ""),
-		LogLevel:          getEnv("LOG_LEVEL", "info"),
-		AnonimizarPII:     getEnvBool("ANONIMIZAR_PII", true),
+		Port:               getEnv("PORT", "8080"),
+		Headless:           getEnvBool("HEADLESS", true),
+		ChromePath:         getEnv("CHROME_PATH", ""),
+		NavTimeout:         getEnvDuration("NAV_TIMEOUT", 45*time.Second),
+		PageLoadWait:       getEnvDuration("PAGE_LOAD_WAIT", 2*time.Second),
+		GovBrLoginURL:      getEnv("GOVBR_LOGIN_URL", "https://sso.acesso.gov.br/login"),
+		DetranRSURL:        getEnv("DETRANRS_URL", ""),
+		LoginMode:          getEnv("LOGIN_MODE", ""),
+		ChromeDebugURL:     getEnv("CHROME_DEBUG_URL", "http://localhost:9222"),
+		SessionTokenAPIKey: getEnv("SESSION_TOKEN_APIKEY", ""),
+		LogLevel:           getEnv("LOG_LEVEL", "info"),
+		AnonymizePII:       getEnvBool("ANONYMIZE_PII", true),
 	}
 
 	if cfg.NavTimeout <= 0 {
-		return Config{}, fmt.Errorf("config: NAV_TIMEOUT deve ser > 0")
+		return Config{}, fmt.Errorf("config: NAV_TIMEOUT must be > 0")
 	}
 	return cfg, nil
 }

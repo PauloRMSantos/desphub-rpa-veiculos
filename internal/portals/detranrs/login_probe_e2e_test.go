@@ -1,3 +1,21 @@
+//go:build e2e
+
+// Manual gov.br -> DETRAN-RS login probe. Not part of CI. Connects to the Chrome
+// YOU opened with remote debugging (so gov.br's captcha is not invalidated by
+// bot detection) and confirms the Bearer/X-User-Id capture.
+//
+// 1) Open a dedicated Chrome with remote debugging (own profile, persists login):
+//
+//	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+//	  --remote-debugging-port=9222 --user-data-dir="$HOME/.desphub-chrome" \
+//	  https://pcsdetran.rs.gov.br/consulta-veiculo?contabiliza=true
+//
+// 2) Run the probe (it opens a tab in that Chrome; log in to gov.br):
+//
+//	RUN_LOGIN_PROBE=1 TEST_PLATE=IDX1756 TEST_RENAVAM=00561040575 \
+//	  go test -tags e2e ./internal/portals/detranrs -run TestLoginProbe -v -timeout 360s
+//
+// The output masks the token — it never prints the full value.
 package detranrs
 
 import (
@@ -12,7 +30,7 @@ import (
 
 func TestLoginProbe(t *testing.T) {
 	if os.Getenv("RUN_LOGIN_PROBE") == "" {
-		t.Skip("defina RUN_LOGIN_PROBE=1 e um Chrome com --remote-debugging-port aberto")
+		t.Skip("set RUN_LOGIN_PROBE=1 and open a Chrome with --remote-debugging-port")
 	}
 	debugURL := os.Getenv("CHROME_DEBUG_URL")
 	if debugURL == "" {
@@ -25,7 +43,7 @@ func TestLoginProbe(t *testing.T) {
 		PageLoadWait: 2 * time.Second,
 	}, log)
 	if err != nil {
-		t.Fatalf("conectar ao Chrome (%s) falhou: %v — abriu o Chrome com --remote-debugging-port=9222?", debugURL, err)
+		t.Fatalf("connecting to Chrome (%s) failed: %v — did you open Chrome with --remote-debugging-port=9222?", debugURL, err)
 	}
 	defer sess.Close()
 
@@ -34,27 +52,26 @@ func TestLoginProbe(t *testing.T) {
 
 	auth, err := Login(ctx, sess, log, LoginManualTimeout)
 	if err != nil {
-		t.Fatalf("Login falhou: %v", err)
+		t.Fatalf("Login failed: %v", err)
 	}
 	if auth.Bearer == "" {
-		t.Fatal("Bearer vazio — não capturado")
+		t.Fatal("empty Bearer — not captured")
 	}
-	t.Logf("OK captura → Bearer=%s… (len=%d)  X-User-Id=%q",
-		mascarar(auth.Bearer), len(auth.Bearer), auth.UserID)
+	t.Logf("OK capture -> Bearer=%s… (len=%d)  X-User-Id=%q", mask(auth.Bearer), len(auth.Bearer), auth.UserID)
 
-	if placa, renavam := os.Getenv("TEST_PLACA"), os.Getenv("TEST_RENAVAM"); placa != "" && renavam != "" {
+	// Optional end-to-end proof: query a vehicle if plate/renavam are provided.
+	if plate, renavam := os.Getenv("TEST_PLATE"), os.Getenv("TEST_RENAVAM"); plate != "" && renavam != "" {
 		c := NewClient(DefaultBaseURL)
 		c.SetAuth(auth)
-		resp, err := c.Consultar(ctx, placa, renavam)
+		resp, err := c.Query(ctx, plate, renavam)
 		if err != nil {
-			t.Fatalf("Consultar falhou: %v", err)
+			t.Fatalf("Query failed: %v", err)
 		}
-		t.Logf("veículo: %s (%d) — situação %q",
-			resp.Veiculo.MarcaModelo, resp.Veiculo.AnoModelo, resp.Veiculo.SituacaoRenavam)
+		t.Logf("vehicle: %s (%d) — status %q", resp.Vehicle.MakeModel, resp.Vehicle.ModelYear, resp.Vehicle.RenavamStatus)
 	}
 }
 
-func mascarar(s string) string {
+func mask(s string) string {
 	if len(s) <= 8 {
 		return "****"
 	}

@@ -117,6 +117,11 @@ RPA base URL (example): `http://rpa.internal:8080` (never expose it publicly).
     { "type": "ADMINISTRATIVA",  "description": "Restrição administrativa - RENAJUD" },
     { "type": "THEFT_ROBBERY",   "description": "Vehicle reported stolen/robbed" }
   ],
+  "taxes": [
+    { "year": "2026", "status": "Devido",    "amount": "1234.56", "dueDate": "31/03/2026", "activeDebt": false },
+    { "year": "2025", "status": "Isento",    "amount": "0.00",    "activeDebt": false },
+    { "year": "2023", "status": "Liquidado", "amount": "798.05",  "dueDate": "27/04/2023", "activeDebt": false }
+  ],
   "debts": [
     { "type": "IPVA",  "year": 2026, "amount": "1234.56", "dueDate": "31/03/2026" },
     { "type": "DPVAT", "year": 2026, "amount": "105.65" }
@@ -139,6 +144,11 @@ RPA base URL (example): `http://rpa.internal:8080` (never expose it publicly).
 - `status`: `SUCCESS` (complete), `PARTIAL` (something missing), `ERROR`.
 - Restriction `type` values we synthesize: `THEFT_ROBBERY`, `IMPOUNDED`. Values
   coming from the portal's own restriction list keep the portal's wording.
+- **`taxes` vs `debts`**: `taxes` is the **full IPVA history** — every year with its
+  portal `status` (`Isento`, `Liquidado`, `Devido`, ...), even paid/exempt years.
+  `debts` is the **actionable** list (only what is actually owed now: owed IPVA +
+  owed DPVAT). A settled ("Liquidado") or exempt ("Isento") year appears in `taxes`
+  but not in `debts`. `taxes[].status` values come from the portal (Portuguese).
 
 ---
 
@@ -152,9 +162,12 @@ public record QueryRequest(String plate, String renavam, List<String> types) {}
 public record QueryResponse(
     String jobId, String plate, String source, Instant collectedAt,
     Vehicle vehicle, Licensing licensing, Violations violations,
-    List<Restriction> restrictions, List<Debt> debts,
+    List<Restriction> restrictions, List<TaxEntry> taxes, List<Debt> debts,
     String status, List<StepError> errors
 ) {}
+
+public record TaxEntry(String year, String status, BigDecimal amount,
+                       String dueDate, boolean activeDebt) {}
 
 public record Vehicle(
     String plate, String renavam, String chassis, String makeModel,

@@ -43,7 +43,8 @@
     "historico": [
       { "exercicio": "2026", "situacao": "Devido", "dataVencimento": "31/03/2026", "valorOriginal": "R$ 1.234,56", "debitos": null, "dividaAtiva": false },
       { "exercicio": "2025", "situacao": "Isento", "dataVencimento": null, "valorOriginal": "R$ 0,00", "debitos": null, "dividaAtiva": false },
-      { "exercicio": "2024", "situacao": "Isento", "dataVencimento": null, "valorOriginal": "R$ 0,00", "debitos": null, "dividaAtiva": false }
+      { "exercicio": "2024", "situacao": "Isento", "dataVencimento": null, "valorOriginal": "R$ 0,00", "debitos": null, "dividaAtiva": false },
+      { "exercicio": "2023", "situacao": "Liquidado", "dataVencimento": "27/04/2023", "valorOriginal": "R$ 798,05", "debitos": null, "dividaAtiva": false }
     ]
   },
   "seguro": {

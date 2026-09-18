@@ -75,6 +75,16 @@ type Debt struct {
 	DueDate string `json:"dueDate,omitempty"`
 }
 
+// TaxEntry is one year of the IPVA history (vehicle property tax), preserving
+// the portal's status ("Isento", "Liquidado", "Devido", ...) — not only owed years.
+type TaxEntry struct {
+	Year       string `json:"year"`
+	Status     string `json:"status"` // portal value: Isento / Liquidado / Devido / ...
+	Amount     string `json:"amount"` // decimal string
+	DueDate    string `json:"dueDate,omitempty"`
+	ActiveDebt bool   `json:"activeDebt"`
+}
+
 type ViolationSummary struct {
 	Count  int    `json:"count"`
 	Amount string `json:"amount"`
@@ -102,6 +112,7 @@ type QueryResponse struct {
 	Licensing   *Licensing   `json:"licensing,omitempty"`
 	Violations  *Violations  `json:"violations,omitempty"`
 	Restrictions []Restriction `json:"restrictions,omitempty"`
+	Taxes       []TaxEntry   `json:"taxes,omitempty"` // full IPVA history (all years + status)
 	Debts       []Debt       `json:"debts,omitempty"`
 	Status      Status       `json:"status"`
 	Errors      []StepError  `json:"errors,omitempty"`

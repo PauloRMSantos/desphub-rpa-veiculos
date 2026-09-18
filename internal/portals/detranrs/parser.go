@@ -131,18 +131,26 @@ func ParseVehicle(raw []byte) (*model.QueryResponse, error) {
 		}
 	}
 
-	// IPVA debts: only the ones actually owed (skip "exempt"/zero).
+	// IPVA history: expose EVERY year with its status ("Isento", "Liquidado",
+	// "Devido", ...). Owed years also go into debts (actionable).
 	for _, h := range r.Tax.History {
 		amount := normalizeBRLAmount(h.OrigAmount)
-		if isExempt(h.Situation) || amount == "0.00" {
-			continue
-		}
-		resp.Debts = append(resp.Debts, model.Debt{
-			Type:    "IPVA",
-			Year:    safeAtoi(h.Year),
-			Amount:  amount,
-			DueDate: deref(h.DueDate),
+		dueDate := deref(h.DueDate)
+		resp.Taxes = append(resp.Taxes, model.TaxEntry{
+			Year:       h.Year,
+			Status:     h.Situation,
+			Amount:     amount,
+			DueDate:    dueDate,
+			ActiveDebt: h.ActiveDebt,
 		})
+		if isOwedTax(h.Situation, h.ActiveDebt) && amount != "0.00" {
+			resp.Debts = append(resp.Debts, model.Debt{
+				Type:    "IPVA",
+				Year:    safeAtoi(h.Year),
+				Amount:  amount,
+				DueDate: dueDate,
+			})
+		}
 	}
 
 	// Restrictions.
@@ -218,6 +226,20 @@ func normalizeBRLAmount(s string) string {
 func isExempt(status string) bool {
 	s := strings.ToLower(strings.TrimSpace(status))
 	return s == "isento" || s == "não devido" || s == "nao devido"
+}
+
+// isOwedTax reports whether an IPVA history entry is actually owed. Statuses
+// like "Isento", "Liquidado" (settled) and "Pago" are NOT owed. An entry flagged
+// as dívida ativa (activeDebt) is always owed.
+func isOwedTax(status string, activeDebt bool) bool {
+	if activeDebt {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "devido", "em aberto", "vencido", "em atraso", "pendente", "a pagar":
+		return true
+	}
+	return false
 }
 
 func renavamString(r int64) string {

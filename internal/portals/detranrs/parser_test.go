@@ -77,6 +77,25 @@ func TestParseVehicle(t *testing.T) {
 		t.Errorf("dueDate = %q; want 31/03/2026", d.DueDate)
 	}
 
+	// --- Taxes: FULL IPVA history with status (all years, not only owed) ---
+	if len(resp.Taxes) != 4 {
+		t.Fatalf("expected 4 tax history entries, got %d: %+v", len(resp.Taxes), resp.Taxes)
+	}
+	taxByYear := map[string]model.TaxEntry{}
+	for _, tx := range resp.Taxes {
+		taxByYear[tx.Year] = tx
+	}
+	if tx := taxByYear["2026"]; tx.Status != "Devido" || tx.Amount != "1234.56" {
+		t.Errorf("tax 2026 = %+v; want status Devido / 1234.56", tx)
+	}
+	if tx := taxByYear["2025"]; tx.Status != "Isento" || tx.Amount != "0.00" {
+		t.Errorf("tax 2025 = %+v; want status Isento / 0.00", tx)
+	}
+	// "Liquidado" (settled) shows in taxes but must NOT be counted as an owed debt.
+	if tx := taxByYear["2023"]; tx.Status != "Liquidado" || tx.Amount != "798.05" {
+		t.Errorf("tax 2023 = %+v; want status Liquidado / 798.05", tx)
+	}
+
 	// --- Restrictions: fixture has restricoes=null ---
 	if len(resp.Restrictions) != 0 {
 		t.Errorf("expected 0 restrictions, got %d", len(resp.Restrictions))

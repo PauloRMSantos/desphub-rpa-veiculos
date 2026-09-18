@@ -1,76 +1,88 @@
-# DespHub — Módulo RPA
+# DespHub RPA — Vehicle Query (DETRAN-RS)
 
-Microsserviço em **Go + chromedp** que automatiza consultas nos portais
-governamentais (DETRAN-RS via login gov.br) e entrega dados veiculares
-normalizados ao backend Spring Boot do DespHub.
+Go + chromedp microservice that automates queries on government portals
+(DETRAN-RS via gov.br login) and delivers normalized vehicle data to the DespHub
+Spring Boot backend.
 
-> Documento de contexto/escopo completo: `RPA.md` (fora do repo, fornecido pelo autor).
+> Integration guide for back/front: [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
-## Status
+## Architecture
 
-- **Fase 0 — Setup:** ✅ estrutura, config, logger, browser (chromedp), model, API skeleton.
-- **Fase 1 — MVP:** ⏳ navigator (login gov.br + consulta) + parser (goquery) + endpoint síncrono. Aguardando URL exata e fixture HTML real.
+Three layers isolated by interfaces:
 
-## Arquitetura
-
-Três camadas isoladas por interfaces:
-
-- **navegação** (`internal/browser`, `internal/portals/*`): chromedp, frágil, muda com o portal.
-- **parsing** (`internal/portals/*/parser.go`): goquery, testável com fixtures, **nunca toca rede**.
-- **domínio** (`internal/model`, `internal/consulta`): structs limpas e casos de uso.
+- **navigation** (`internal/browser`, `internal/portals/*`): chromedp, fragile,
+  changes with the portal.
+- **parsing** (`internal/portals/*/parser.go`): JSON → normalized contract,
+  testable with fixtures, **never touches the network**.
+- **domain** (`internal/model`, `internal/query`): clean structs and use cases.
 
 ```
 cmd/rpa            entrypoint (HTTP server)
-internal/config    config via env (12-factor)
-internal/logger    slog JSON + jobId de correlação
-internal/browser   fábrica de sessão chromedp (timeout, headless, reuso de sessão)
-internal/model     DTOs de request/response
-internal/api       handlers REST
-internal/portals   navegação + parsing por portal (detranrs)
-internal/consulta  orquestração de domínio
-internal/captcha   interface Solver (fase 4)
-fixtures           HTML real dos portais para testes de parser
-docker/Dockerfile  build multi-stage com Chromium
+cmd/desphub-login  Mac helper: captures the gov.br token and pushes it (token mode)
+internal/config    env config (12-factor)
+internal/logger    slog JSON + jobId correlation
+internal/browser   chromedp session factory (local and remote/attach)
+internal/model     request/response DTOs (the public contract)
+internal/query     domain orchestration (status, anonymization)
+internal/api       REST handlers
+internal/portals   navigation + parsing per portal (detranrs)
+internal/pii       PII anonymization (LGPD)
+fixtures           real portal JSON for parser tests
+deploy/            systemd unit + env for VPS deploy
+docs/              integration guide
 ```
 
-## Rodando local
+## Login modes
+
+The gov.br login needs a real browser + occasional human. Two modes:
+
+- **`LOGIN_MODE=manual`** (local/dev): the RPA attaches to a Chrome you open with
+  remote debugging (`scripts/start-chrome.sh`) and captures the token.
+- **`LOGIN_MODE=token`** (VPS/prod): the RPA runs headless with no browser; the
+  token is captured on your Mac and pushed via `POST /api/detran/session/token`.
+
+## Running locally (manual mode)
 
 ```bash
-cp .env.example .env      # ajuste conforme necessário
-go run ./cmd/rpa
+bash scripts/start-chrome.sh          # opens the dedicated Chrome
+LOGIN_MODE=manual PORT=8090 go run ./cmd/rpa
 ```
 
 Health check:
 
 ```bash
-curl -s localhost:8080/health
+curl -s localhost:8090/health
 ```
 
-Contrato (ainda retorna 501 até a Fase 1):
+Query:
 
 ```bash
-curl -s -X POST localhost:8080/api/detran/consultas \
+curl -s -X POST localhost:8090/api/detran/queries \
   -H 'content-type: application/json' \
-  -d '{"placa":"ABC1D23","renavam":"00123456789","tipos":["DADOS_CADASTRAIS"]}'
+  -d '{"plate":"IDX1756","renavam":"00561040575","types":["REGISTRATION","DEBTS","RESTRICTIONS","LICENSING"]}'
 ```
 
-## Testes
+## Tests
 
 ```bash
-go test ./...                          # unitários (parsers com fixtures)
-go test -tags e2e ./internal/browser   # smoke real do chromedp (abre o portal)
+go test ./...                          # unit (parsers with fixtures)
+go test -tags e2e ./internal/browser   # real chromedp smoke (opens the portal)
 ```
 
-## Docker
+## Deploy on a VPS (no Docker, no Go on the host)
+
+Cross-compile on the Mac, copy the binary, run as a systemd service:
 
 ```bash
-docker build -f docker/Dockerfile -t desphub-rpa .
-docker run --rm -p 8080:8080 desphub-rpa
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o desphub-rpa ./cmd/rpa
+scp desphub-rpa deploy/desphub-rpa.* user@vps:/tmp/
 ```
 
-## Notas LGPD
+See [deploy/desphub-rpa.service](deploy/desphub-rpa.service) for the install steps.
 
-- Credenciais gov.br nunca são logadas nem retornadas.
-- Placa é mascarada nos logs.
-- `.env` e sessões persistidas ficam no `.gitignore`.
-# desphub-rpa-veiculos
+## LGPD notes
+
+- gov.br credentials/token are never logged nor returned.
+- The plate is masked in logs; the owner CPF is masked in the response
+  (`ANONYMIZE_PII=true`).
+- `.env` and persisted sessions are in `.gitignore`.

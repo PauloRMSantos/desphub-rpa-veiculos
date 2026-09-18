@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/rpa ./cmd/rpa
 
-# ---- Stage 2: runtime com Chromium ----
+# ---- Stage 2: runtime with Chromium ----
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
         chromium \
@@ -16,14 +16,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# chromedp usa o Chromium do sistema.
+# chromedp uses the system Chromium.
 ENV CHROME_PATH=/usr/bin/chromium
 ENV HEADLESS=true
 ENV PORT=8080
 
 COPY --from=build /out/rpa /usr/local/bin/rpa
 
-# Usuário não-root.
+# Non-root user.
 RUN useradd -m -u 10001 rpa
 USER rpa
 

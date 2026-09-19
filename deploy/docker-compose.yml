@@ -1,0 +1,51 @@
+# DespHub — orquestração da VPS.
+#
+# Sobe o RPA numa rede Docker interna. O backend Java entra na MESMA rede e
+# chama o RPA por http://desphub-rpa:8080 (nome do serviço). O RPA NÃO publica
+# porta no host → invisível para a internet; só o backend o alcança.
+#
+# Uso (na VPS, a partir da raiz do repo do RPA):
+#   echo "SESSION_TOKEN_APIKEY=<sua-chave>" > deploy/.env
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#   docker compose -f deploy/docker-compose.yml logs -f desphub-rpa
+
+name: desphub
+
+services:
+  desphub-rpa:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.vps
+    image: desphub-rpa:latest
+    container_name: desphub-rpa
+    restart: unless-stopped
+    environment:
+      LOGIN_MODE: token
+      BIND_HOST: 0.0.0.0        # dentro do container; sem 'ports:' não vaza pro host
+      PORT: "8080"
+      LOG_LEVEL: info
+      ANONYMIZE_PII: "true"
+      SESSION_TOKEN_APIKEY: ${SESSION_TOKEN_APIKEY:?defina em deploy/.env}
+    networks:
+      - desphub-net
+    # Sem 'ports:' de propósito: o RPA fica acessível só dentro de desphub-net.
+
+  # --- Quando você for subir o backend, ele entra assim (exemplo) ---
+  # backend:
+  #   image: desphub-backend:latest      # sua imagem do Spring Boot
+  #   container_name: desphub-backend
+  #   restart: unless-stopped
+  #   environment:
+  #     # o backend fala com o RPA pelo nome do serviço, na rede interna:
+  #     RPA_BASE_URL: http://desphub-rpa:8080
+  #     RPA_SESSION_TOKEN_APIKEY: ${SESSION_TOKEN_APIKEY}
+  #   ports:
+  #     - "443:8080"     # só o backend publica porta pra internet
+  #   depends_on:
+  #     - desphub-rpa
+  #   networks:
+  #     - desphub-net
+
+networks:
+  desphub-net:
+    name: desphub-net

@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+#
+# Minimal image for the VPS (LOGIN_MODE=token): the RPA is a pure REST service
+# that never opens a browser, so NO Chromium is needed — this image is tiny.
+#
+# Multi-stage: Go lives ONLY inside the build stage, so the VPS needs Docker but
+# NOT a Go toolchain. Build from the repo root:
+#   docker build -f docker/Dockerfile.vps -t desphub-rpa:latest .
+# (or let docker-compose build it — see deploy/docker-compose.yml)
+
+# ---- Stage 1: build the static binary ----
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/desphub-rpa ./cmd/rpa
+
+# ---- Stage 2: minimal runtime ----
+FROM alpine:3.20
+# ca-certificates so the outbound HTTPS calls to the DETRAN-RS API validate.
+RUN apk add --no-cache ca-certificates && adduser -D -u 10001 rpa
+COPY --from=build /out/desphub-rpa /usr/local/bin/desphub-rpa
+USER rpa
+# Bind to all interfaces INSIDE the container; the port is never published to the
+# host, so it stays reachable only by sibling containers on the same network.
+ENV BIND_HOST=0.0.0.0 PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/desphub-rpa"]

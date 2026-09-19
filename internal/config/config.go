@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	Port string
+	BindHost string
+	Port     string
 
 	Headless     bool
 	ChromePath   string
@@ -31,6 +32,7 @@ type Config struct {
 
 func Load() (Config, error) {
 	cfg := Config{
+		BindHost:           getEnv("BIND_HOST", "127.0.0.1"),
 		Port:               getEnv("PORT", "8080"),
 		Headless:           getEnvBool("HEADLESS", true),
 		ChromePath:         getEnv("CHROME_PATH", ""),

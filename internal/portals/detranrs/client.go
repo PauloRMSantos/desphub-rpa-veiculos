@@ -53,8 +53,15 @@ func (c *Client) SetUserAgent(ua string) {
 
 func (c *Client) Name() string { return "DETRAN-RS" }
 
+// Query uses the client's stored auth (single-tenant / manual mode).
 func (c *Client) Query(ctx context.Context, plate, renavam string) (*model.QueryResponse, error) {
-	raw, err := c.queryVehicle(ctx, plate, renavam)
+	return c.QueryWithAuth(ctx, plate, renavam, c.auth)
+}
+
+// QueryWithAuth runs a query with per-request credentials, touching no shared
+// state — safe for concurrent multi-tenant calls on the same Client.
+func (c *Client) QueryWithAuth(ctx context.Context, plate, renavam string, auth Auth) (*model.QueryResponse, error) {
+	raw, err := c.queryVehicle(ctx, plate, renavam, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +70,8 @@ func (c *Client) Query(ctx context.Context, plate, renavam string) (*model.Query
 
 const maxAttempts = 3
 
-func (c *Client) queryVehicle(ctx context.Context, plate, renavam string) ([]byte, error) {
-	if c.auth.Bearer == "" || c.auth.UserID == "" {
+func (c *Client) queryVehicle(ctx context.Context, plate, renavam string, auth Auth) ([]byte, error) {
+	if auth.Bearer == "" || auth.UserID == "" {
 		return nil, fmt.Errorf("detranrs: missing credentials (Bearer/X-User-Id) — log in first")
 	}
 
@@ -76,7 +83,7 @@ func (c *Client) queryVehicle(ctx context.Context, plate, renavam string) ([]byt
 
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		body, status, err := c.doGet(ctx, endpoint)
+		body, status, err := c.doGet(ctx, endpoint, auth)
 		switch {
 		case err != nil:
 			lastErr = err
@@ -99,14 +106,14 @@ func (c *Client) queryVehicle(ctx context.Context, plate, renavam string) ([]byt
 	return nil, fmt.Errorf("detranrs: failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
-func (c *Client) doGet(ctx context.Context, endpoint string) ([]byte, int, error) {
+func (c *Client) doGet(ctx context.Context, endpoint string, auth Auth) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, 0, err
 	}
 	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("Authorization", "Bearer "+c.auth.Bearer)
-	req.Header.Set("X-User-Id", c.auth.UserID)
+	req.Header.Set("Authorization", "Bearer "+auth.Bearer)
+	req.Header.Set("X-User-Id", auth.UserID)
 	req.Header.Set("Origin", spaOrigin)
 	req.Header.Set("Referer", spaReferer)
 	req.Header.Set("User-Agent", c.ua)

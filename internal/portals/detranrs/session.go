@@ -33,7 +33,10 @@ func NewSessionPortal(debugURL string, navOpts browser.Options, baseURL string, 
 
 func (p *SessionPortal) Name() string { return "DETRAN-RS" }
 
-func (p *SessionPortal) Query(ctx context.Context, plate, renavam string) (*model.QueryResponse, error) {
+// Query ignores per-request creds: manual mode uses the operator's browser
+// session captured into the client. (Per-request credentials are the token
+// mode's multi-tenant path.)
+func (p *SessionPortal) Query(ctx context.Context, plate, renavam string, _ *model.SessionCredentials) (*model.QueryResponse, error) {
 	if err := p.ensureLogin(ctx, false); err != nil {
 		return nil, err
 	}

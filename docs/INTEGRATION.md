@@ -49,13 +49,23 @@ RPA base URL (example): `http://rpa.internal:8080` (never expose it publicly).
 {
   "plate": "IDX1756",
   "renavam": "00561040575",
-  "types": ["REGISTRATION", "DEBTS", "RESTRICTIONS", "LICENSING"]
+  "types": ["REGISTRATION", "DEBTS", "RESTRICTIONS", "LICENSING"],
+  "session": {
+    "bearer": "<the office's gov.br JWT>",
+    "userId": "<the office's X-User-Id, base64 CPF>"
+  }
 }
 ```
 - `plate` **or** `renavam` is required (sending both is recommended).
 - `types`: a list with at least one of `REGISTRATION`, `DEBTS`, `RESTRICTIONS`,
   `LICENSING`. (Today the DETRAN API returns everything in one call; `types`
   documents intent and enables future filtering.)
+- **`session` (multi-tenant, recommended):** the caller's own gov.br session,
+  passed **per request**. The RPA uses exactly these credentials and keeps **no
+  shared state**, so two offices can never collide (no cross-tenant data leak).
+  The backend already stores each office's `{bearer, userId}` (see §6) — send
+  them here. **Omit `session`** only in single-tenant/manual setups, where the
+  RPA falls back to a globally injected token (`POST /session/token`).
 
 **Response (200):** see the full contract in section 3.
 
@@ -157,7 +167,11 @@ RPA base URL (example): `http://rpa.internal:8080` (never expose it publicly).
 ### 4.1 DTOs (records)
 
 ```java
-public record QueryRequest(String plate, String renavam, List<String> types) {}
+// Pass the office's own session per request (multi-tenant). See §2.1.
+public record SessionCredentials(String bearer, String userId) {}
+
+public record QueryRequest(String plate, String renavam, List<String> types,
+                           SessionCredentials session) {}
 
 public record QueryResponse(
     String jobId, String plate, String source, Instant collectedAt,

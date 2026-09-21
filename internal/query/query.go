@@ -12,7 +12,9 @@ import (
 )
 
 type Portal interface {
-	Query(ctx context.Context, plate, renavam string) (*model.QueryResponse, error)
+	// Query runs a vehicle query. creds carries per-request (multi-tenant)
+	// session credentials; when nil the portal uses its own session/token.
+	Query(ctx context.Context, plate, renavam string, creds *model.SessionCredentials) (*model.QueryResponse, error)
 	Name() string
 }
 
@@ -35,7 +37,7 @@ func (s *Service) Execute(ctx context.Context, jobID string, req model.QueryRequ
 		CollectedAt: time.Now().UTC(),
 	}
 
-	resp, err := s.portal.Query(ctx, req.Plate, req.Renavam)
+	resp, err := s.portal.Query(ctx, req.Plate, req.Renavam, req.Session)
 	if err != nil {
 		step := "portal"
 		if errors.Is(err, model.ErrReconnectRequired) {

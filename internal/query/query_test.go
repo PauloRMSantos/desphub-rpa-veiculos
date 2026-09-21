@@ -17,7 +17,7 @@ type fakePortal struct {
 }
 
 func (p fakePortal) Name() string { return "FAKE" }
-func (p fakePortal) Query(_ context.Context, _, _ string) (*model.QueryResponse, error) {
+func (p fakePortal) Query(_ context.Context, _, _ string, _ *model.SessionCredentials) (*model.QueryResponse, error) {
 	return p.resp, p.err
 }
 

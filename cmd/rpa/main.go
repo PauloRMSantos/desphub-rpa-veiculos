@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	"github.com/paulorosantos/desphub-rpa/internal/api"
 	"github.com/paulorosantos/desphub-rpa/internal/browser"
 	"github.com/paulorosantos/desphub-rpa/internal/config"
@@ -19,6 +21,10 @@ import (
 )
 
 func main() {
+	// Dev convenience: load .env if present. It does NOT override variables
+	// already set in the real environment, so systemd/Docker still win in prod.
+	_ = godotenv.Load()
+
 	cfg, err := config.Load()
 	if err != nil {
 		os.Stderr.WriteString("error loading config: " + err.Error() + "\n")

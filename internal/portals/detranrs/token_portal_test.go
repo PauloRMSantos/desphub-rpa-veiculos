@@ -13,9 +13,19 @@ import (
 
 func TestTokenPortalWithoutTokenNeedsReconnect(t *testing.T) {
 	p := NewTokenPortal("")
-	_, err := p.Query(context.Background(), "ABC1D23", "123")
+	_, err := p.Query(context.Background(), "ABC1D23", "123", nil)
 	if !errors.Is(err, model.ErrReconnectRequired) {
 		t.Fatalf("without token expected ErrReconnectRequired, got %v", err)
+	}
+}
+
+// A per-request session with no injected global token still requires a valid
+// session; here the multi-tenant path is exercised with empty creds → fallback.
+func TestTokenPortalPerRequestEmptyCredsNeedsReconnect(t *testing.T) {
+	p := NewTokenPortal("")
+	_, err := p.Query(context.Background(), "ABC1D23", "123", &model.SessionCredentials{})
+	if !errors.Is(err, model.ErrReconnectRequired) {
+		t.Fatalf("empty per-request creds expected ErrReconnectRequired, got %v", err)
 	}
 }
 

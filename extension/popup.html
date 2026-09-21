@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        width: 260px;
+        margin: 0;
+        padding: 14px 16px;
+      }
+      h1 { font-size: 14px; margin: 0 0 10px; }
+      .row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 6px 0; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: #9ca3af; flex: none; }
+      .dot.armed { background: #f59e0b; }
+      .dot.ok { background: #16a34a; }
+      .dot.err { background: #dc2626; }
+      .muted { color: #6b7280; font-size: 12px; }
+      code { font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <h1>DespHub — Conector gov.br</h1>
+    <div class="row"><span id="dot" class="dot"></span><span id="state">Verificando…</span></div>
+    <div id="detail" class="muted"></div>
+    <p class="muted">
+      Este conector é acionado pelo DespHub ao clicar em <b>“Conectar conta
+      gov.br”</b>. Você não precisa fazer nada aqui.
+    </p>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "DespHub — Conector gov.br",
+  "version": "0.1.0",
+  "description": "Captures the gov.br/DETRAN-RS session in the broker's own browser and hands it to the DespHub backend.",
+  "permissions": ["webRequest", "storage"],
+  "host_permissions": [
+    "https://pcsdetran.procergs.com.br/*",
+    "https://pcsdetran.rs.gov.br/*",
+    "http://localhost/*",
+    "https://app.desphub.com/*",
+    "https://api.desphub.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "https://app.desphub.com/*"],
+      "js": ["content-desphub.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://pcsdetran.rs.gov.br/*"],
+      "js": ["content-capture-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://pcsdetran.rs.gov.br/*"],
+      "js": ["content-capture-bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "DespHub gov.br"
+  }
+}

@@ -29,12 +29,23 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
+// SessionCredentials carries a gov.br session (Bearer + X-User-Id) supplied
+// per request. This is the multi-tenant path: each office's backend passes its
+// own captured session, so the RPA never relies on a single shared token and
+// two offices can never collide. When omitted, the portal falls back to a
+// globally injected token (single-tenant / manual mode).
+type SessionCredentials struct {
+	Bearer string `json:"bearer"`
+	UserID string `json:"userId"`
+}
+
 type QueryRequest struct {
-	Plate       string       `json:"plate"`
-	Renavam     string       `json:"renavam"`
-	Chassis     string       `json:"chassis,omitempty"`
-	Types       []QueryType  `json:"types"`
-	Credentials *Credentials `json:"credentials,omitempty"`
+	Plate       string              `json:"plate"`
+	Renavam     string              `json:"renavam"`
+	Chassis     string              `json:"chassis,omitempty"`
+	Types       []QueryType         `json:"types"`
+	Credentials *Credentials        `json:"credentials,omitempty"`
+	Session     *SessionCredentials `json:"session,omitempty"`
 }
 
 type Vehicle struct {

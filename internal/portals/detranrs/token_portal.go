@@ -40,7 +40,19 @@ func (p *TokenPortal) Status() (authed bool, expiresAt time.Time) {
 	return p.authed, p.expiresAt
 }
 
-func (p *TokenPortal) Query(ctx context.Context, plate, renavam string) (*model.QueryResponse, error) {
+func (p *TokenPortal) Query(ctx context.Context, plate, renavam string, creds *model.SessionCredentials) (*model.QueryResponse, error) {
+	// Multi-tenant path: use the per-request credentials, touching no shared
+	// state. Each office queries with its own session; they never collide.
+	if creds != nil && creds.Bearer != "" && creds.UserID != "" {
+		resp, err := p.client.QueryWithAuth(ctx, plate, renavam, Auth{Bearer: creds.Bearer, UserID: creds.UserID})
+		if errors.Is(err, ErrSessionExpired) {
+			// Only this request's session expired — do NOT flip global state.
+			return nil, model.ErrReconnectRequired
+		}
+		return resp, err
+	}
+
+	// Fallback: a single globally injected token (single-tenant / manual mode).
 	p.mu.RLock()
 	authed := p.authed
 	p.mu.RUnlock()

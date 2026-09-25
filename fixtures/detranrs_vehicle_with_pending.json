@@ -28,7 +28,14 @@
     "temErro": false,
     "historico": [
       { "exercicio": "2026", "situacao": "Devido", "dataVencimento": "31/03/2026", "valorOriginal": "R$ 1.234,56", "dividaAtiva": false },
-      { "exercicio": "2025", "situacao": "Devido", "dataVencimento": "31/03/2025", "valorOriginal": "R$ 980,00", "dividaAtiva": true }
+      { "exercicio": "2025", "situacao": "Devido", "dataVencimento": "31/03/2025", "valorOriginal": "R$ 980,00", "dividaAtiva": true },
+      { "exercicio": "2023", "situacao": "Em Divida Ativa Liquidada/Concluida", "dataVencimento": "27/04/2023", "valorOriginal": "R$ 1.301,61", "dividaAtiva": false }
+    ]
+  },
+  "caracteristicaEspecial": {
+    "temErro": false,
+    "caracteristicas": [
+      { "descricao": "008004 Recuperado de sinistro", "origem": "N/D", "nroCsv": "15360601302023", "dataInicio": null }
     ]
   },
   "seguro": {

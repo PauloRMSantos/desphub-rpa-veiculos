@@ -103,10 +103,8 @@ RPA base URL (example): `http://rpa.internal:8080` (never expose it publicly).
     "color": "Bege",
     "type": "Automóvel",
     "species": "Passageiro",
-    "category": "",
     "city": "CARAA",
     "plateState": "RS",
-    "fuel": "",
     "renavamStatus": "Em circulação",
     "ownerCpf": "***.223.100-**"
   },
@@ -176,7 +174,8 @@ public record QueryRequest(String plate, String renavam, List<String> types,
 public record QueryResponse(
     String jobId, String plate, String source, Instant collectedAt,
     Vehicle vehicle, Licensing licensing, Violations violations,
-    List<Restriction> restrictions, List<TaxEntry> taxes, List<Debt> debts,
+    List<Restriction> restrictions, List<SpecialCharacteristic> specialCharacteristics,
+    List<TaxEntry> taxes, List<Debt> debts,
     String status, List<StepError> errors
 ) {}
 
@@ -186,8 +185,8 @@ public record TaxEntry(String year, String status, BigDecimal amount,
 public record Vehicle(
     String plate, String renavam, String chassis, String makeModel,
     Integer manufactureYear, Integer modelYear, String color, String type,
-    String species, String category, String city, String plateState,
-    String fuel, String renavamStatus, String ownerCpf
+    String species, String city, String plateState,
+    String renavamStatus, String ownerCpf
 ) {}
 
 public record Licensing(String year, String documentStatus,
@@ -199,6 +198,10 @@ public record Violations(ViolationSummary upcoming, ViolationSummary overdue,
                          ViolationSummary awaitingJudgment) {}
 
 public record Restriction(String type, String description) {}
+
+// Special characteristics — flags like "Recuperado de sinistro" (salvage/rebuilt).
+public record SpecialCharacteristic(String description, String origin,
+                                    String code, String startDate) {}
 public record Debt(String type, Integer year, BigDecimal amount, String dueDate) {}
 public record StepError(String step, String message) {}
 ```

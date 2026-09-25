@@ -29,8 +29,6 @@ type apiResponse struct {
 		Chassis             string `json:"chassi"`
 		Situation           string `json:"situacao"`
 		OwnerCPF            string `json:"cpfProprietario"`
-		Fuel                string `json:"combustivel"`
-		Category            string `json:"categoria"`
 		ManufactureYear     int    `json:"anoFabricacao"`
 		ModelYear           int    `json:"anoModelo"`
 		LicensingDueDate    string `json:"dtVencLicenciamento"`
@@ -65,6 +63,17 @@ type apiResponse struct {
 			Description string `json:"descricao"`
 		} `json:"restricoes"`
 	} `json:"restricao"`
+
+	// SpecialChars = "caracteristica especial" (e.g. "Recuperado de sinistro").
+	SpecialChars struct {
+		HasError        bool `json:"temErro"`
+		Characteristics []struct {
+			Description string  `json:"descricao"`
+			Origin      string  `json:"origem"`
+			CSV         string  `json:"nroCsv"`
+			StartDate   *string `json:"dataInicio"`
+		} `json:"caracteristicas"`
+	} `json:"caracteristicaEspecial"`
 
 	// Insurance = DPVAT.
 	Insurance struct {
@@ -112,10 +121,8 @@ func ParseVehicle(raw []byte) (*model.QueryResponse, error) {
 			Color:           reg.Color,
 			Type:            reg.Type,
 			Species:         reg.Species,
-			Category:        reg.Category,
 			City:            reg.RegistrationCity,
 			PlateState:      reg.PlateState,
-			Fuel:            reg.Fuel,
 			RenavamStatus:   reg.Situation,
 			OwnerCPF:        reg.OwnerCPF,
 		},
@@ -158,6 +165,20 @@ func ParseVehicle(raw []byte) (*model.QueryResponse, error) {
 		resp.Restrictions = append(resp.Restrictions, model.Restriction{
 			Type:        rr.Type,
 			Description: rr.Description,
+		})
+	}
+
+	// Special characteristics (e.g. "Recuperado de sinistro").
+	for _, sc := range r.SpecialChars.Characteristics {
+		desc := strings.TrimSpace(sc.Description)
+		if desc == "" {
+			continue
+		}
+		resp.SpecialCharacteristics = append(resp.SpecialCharacteristics, model.SpecialCharacteristic{
+			Description: desc,
+			Origin:      strings.TrimSpace(sc.Origin),
+			Code:        strings.TrimSpace(sc.CSV),
+			StartDate:   deref(sc.StartDate),
 		})
 	}
 

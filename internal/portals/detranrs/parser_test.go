@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/paulorosantos/desphub-rpa/internal/model"
@@ -156,6 +157,25 @@ func TestParseVehicleWithPending(t *testing.T) {
 	}
 	if !types["THEFT_ROBBERY"] {
 		t.Error("expected THEFT_ROBBERY restriction (furtado=true)")
+	}
+
+	// --- Special characteristics: "Recuperado de sinistro" (salvage) ---
+	if len(resp.SpecialCharacteristics) != 1 {
+		t.Fatalf("expected 1 special characteristic, got %d: %+v", len(resp.SpecialCharacteristics), resp.SpecialCharacteristics)
+	}
+	sc := resp.SpecialCharacteristics[0]
+	if !strings.Contains(sc.Description, "Recuperado de sinistro") {
+		t.Errorf("special characteristic description = %q; want it to mention 'Recuperado de sinistro'", sc.Description)
+	}
+	if sc.Code != "15360601302025" {
+		t.Errorf("special characteristic code = %q; want 15360601302025", sc.Code)
+	}
+
+	// --- "Em Divida Ativa Liquidada/Concluida" (settled) must NOT be a debt ---
+	// ipvaCount stayed 2 (2026 Devido + 2025 dividaAtiva), so the settled active
+	// debt from 2023 was correctly excluded from debts.
+	if ipvaCount != 2 {
+		t.Errorf("settled 'Em Divida Ativa Liquidada/Concluida' wrongly counted as debt (ipvaCount=%d)", ipvaCount)
 	}
 }
 

@@ -29,11 +29,6 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
-// SessionCredentials carries a gov.br session (Bearer + X-User-Id) supplied
-// per request. This is the multi-tenant path: each office's backend passes its
-// own captured session, so the RPA never relies on a single shared token and
-// two offices can never collide. When omitted, the portal falls back to a
-// globally injected token (single-tenant / manual mode).
 type SessionCredentials struct {
 	Bearer string `json:"bearer"`
 	UserID string `json:"userId"`
@@ -58,10 +53,8 @@ type Vehicle struct {
 	Color           string `json:"color,omitempty"`
 	Type            string `json:"type,omitempty"`    // e.g. "Automóvel" (portal value)
 	Species         string `json:"species,omitempty"` // e.g. "Passageiro" (portal value)
-	Category        string `json:"category,omitempty"`
-	City            string `json:"city,omitempty"` 
+	City            string `json:"city,omitempty"`
 	PlateState      string `json:"plateState,omitempty"`
-	Fuel            string `json:"fuel,omitempty"`
 	RenavamStatus   string `json:"renavamStatus,omitempty"`
 	OwnerCPF string `json:"ownerCpf,omitempty"`
 }
@@ -122,9 +115,17 @@ type QueryResponse struct {
 	Vehicle     *Vehicle     `json:"vehicle,omitempty"`
 	Licensing   *Licensing   `json:"licensing,omitempty"`
 	Violations  *Violations  `json:"violations,omitempty"`
-	Restrictions []Restriction `json:"restrictions,omitempty"`
-	Taxes       []TaxEntry   `json:"taxes,omitempty"` // full IPVA history (all years + status)
-	Debts       []Debt       `json:"debts,omitempty"`
-	Status      Status       `json:"status"`
-	Errors      []StepError  `json:"errors,omitempty"`
+	Restrictions           []Restriction           `json:"restrictions,omitempty"`
+	SpecialCharacteristics []SpecialCharacteristic `json:"specialCharacteristics,omitempty"`
+	Taxes                  []TaxEntry              `json:"taxes,omitempty"` // full IPVA history (all years + status)
+	Debts                  []Debt                  `json:"debts,omitempty"`
+	Status                 Status                  `json:"status"`
+	Errors                 []StepError             `json:"errors,omitempty"`
+}
+
+type SpecialCharacteristic struct {
+	Description string `json:"description"`         
+	Origin      string `json:"origin,omitempty"`
+	Code        string `json:"code,omitempty"`      
+	StartDate   string `json:"startDate,omitempty"` 
 }

@@ -80,6 +80,54 @@ RPA base URL (example): `http://rpa.internal:8080` (never expose it publicly).
 | `503` | **gov.br session expired** (`step: reconnect`) | Signal "reconnect gov.br"; don't retry until the token is refreshed |
 | `501` | RPA login not configured | Deploy error (LOGIN_MODE not set) |
 
+### 2.3 Multi-state: RS (fetch) vs SC (ingest)
+
+The `state` field selects the portal (`"RS"` default, `"SC"`). The two work
+differently because of how each government portal is built:
+
+- **RS — fetch-based.** The RPA holds the gov.br session and queries the DETRAN-RS
+  API directly. Send `{plate, renavam, state:"RS", types, session}`; the RPA
+  returns the normalized data.
+- **SC — ingest-based.** Every DETRAN-SC query needs a per-request encrypted token
+  (`c=`) that only the **browser** can generate, so the RPA cannot query SC
+  server-side. Instead the **extension** drives the DETRAN-SC page, captures the
+  raw dossiê JSON, and the backend forwards it to the RPA to normalize:
+  ```json
+  { "plate": "RAC9J36", "state": "SC", "payload": { /* raw DETRAN-SC dossiê JSON */ } }
+  ```
+  The RPA parses `payload` and returns the **same** `QueryResponse` shape. No
+  `types`/`session` needed for SC. (SC populates `fines`, `category`, `fuel`,
+  `ownerName`; RS populates `taxes`, `ownerCpf`, `chassis`.)
+
+#### Front → Backend for SC (who captures the dossiê)
+
+The backend **cannot** resolve an SC query on its own — the `c=` token is
+generated in the broker's browser per request, so **the front must drive the
+extension first**, then hand the captured dossiê to the backend. There is no
+"behind-the-scenes" server resolution for SC.
+
+1. **Front → extension** (the extension drives the DETRAN-SC page and returns the
+   raw dossiê JSON):
+   ```ts
+   import { runScQuery } from "@/lib/govbr-courier";
+   const res = await runScQuery(plate, renavam);
+   if (!res.ok) throw new Error(res.error); // e.g. "login to DETRAN-SC first"
+   // res.payload = raw DETRAN-SC dossiê JSON
+   ```
+2. **Front → backend** (POST — the payload is a large JSON body, not a query string):
+   ```
+   POST /api/vehicles/query
+   { "plate": "...", "renavam": "...", "state": "SC", "payload": { ...raw dossiê... } }
+   ```
+3. **Backend → RPA** (forward `state` + `payload` straight through; do NOT fetch):
+   ```
+   POST /api/detran/queries
+   { "plate": "...", "state": "SC", "payload": { ...same raw dossiê... } }
+   ```
+
+By contrast, **RS** needs no browser step: the front calls the backend, which
+calls the RPA, which fetches. Only SC carries a `payload`.
+
 > Even on error, the body is a `QueryResponse` with `status: "ERROR"` and the
 > `errors[]` list explaining the `step`.
 
@@ -168,25 +216,33 @@ RPA base URL (example): `http://rpa.internal:8080` (never expose it publicly).
 // Pass the office's own session per request (multi-tenant). See §2.1.
 public record SessionCredentials(String bearer, String userId) {}
 
-public record QueryRequest(String plate, String renavam, List<String> types,
-                           SessionCredentials session) {}
+// state selects the portal by UF ("RS" default, or "SC").
+// RS is fetch-based (send types + session). SC is ingest-based: the browser
+// captures the dossiê JSON and you forward it in `payload` (see §2.3).
+public record QueryRequest(String plate, String renavam, String state,
+                           List<String> types, SessionCredentials session,
+                           JsonNode payload) {}
 
 public record QueryResponse(
     String jobId, String plate, String source, Instant collectedAt,
     Vehicle vehicle, Licensing licensing, Violations violations,
     List<Restriction> restrictions, List<SpecialCharacteristic> specialCharacteristics,
-    List<TaxEntry> taxes, List<Debt> debts,
+    List<TaxEntry> taxes, List<Debt> debts, List<Fine> fines,
     String status, List<StepError> errors
 ) {}
 
 public record TaxEntry(String year, String status, BigDecimal amount,
                        String dueDate, boolean activeDebt) {}
 
+// Itemized violation (DETRAN-SC returns these; DETRAN-RS uses Violations aggregates).
+public record Fine(String notice, String description, String date, String location,
+                   BigDecimal amount, String situation, String status) {}
+
 public record Vehicle(
-    String plate, String renavam, String chassis, String makeModel,
+    String plate, String previousPlate, String renavam, String chassis, String makeModel,
     Integer manufactureYear, Integer modelYear, String color, String type,
-    String species, String city, String plateState,
-    String renavamStatus, String ownerCpf
+    String species, String category, String fuel, String city, String plateState,
+    String renavamStatus, String ownerName, String ownerCpf
 ) {}
 
 public record Licensing(String year, String documentStatus,

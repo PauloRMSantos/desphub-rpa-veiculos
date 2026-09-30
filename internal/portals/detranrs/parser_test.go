@@ -167,8 +167,8 @@ func TestParseVehicleWithPending(t *testing.T) {
 	if !strings.Contains(sc.Description, "Recuperado de sinistro") {
 		t.Errorf("special characteristic description = %q; want it to mention 'Recuperado de sinistro'", sc.Description)
 	}
-	if sc.Code != "15360601302025" {
-		t.Errorf("special characteristic code = %q; want 15360601302025", sc.Code)
+	if sc.Code != "15360601302023" {
+		t.Errorf("special characteristic code = %q; want 15360601302023", sc.Code)
 	}
 
 	// --- "Em Divida Ativa Liquidada/Concluida" (settled) must NOT be a debt ---

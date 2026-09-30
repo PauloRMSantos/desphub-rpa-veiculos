@@ -35,6 +35,66 @@ func (p *reconnectablePortal) Reconnect(_ context.Context) error {
 	return p.reconnectErr
 }
 
+// TestExecuteIngestState routes an ingest-based state (e.g. SC) to its parser,
+// not to the fetch portal.
+func TestExecuteIngestState(t *testing.T) {
+	fake := fakePortal{err: errors.New("portal must NOT be called for ingest states")}
+	svc := NewService(fake, newLog(), false)
+
+	called := false
+	svc.RegisterParser("SC", func(raw []byte) (*model.QueryResponse, error) {
+		called = true
+		if string(raw) != `{"placa":"XYZ"}` {
+			t.Errorf("parser got payload %q", raw)
+		}
+		return &model.QueryResponse{Source: "DETRAN-SC", Vehicle: &model.Vehicle{MakeModel: "HONDA/CB"}}, nil
+	})
+
+	got := svc.Execute(context.Background(), "job-sc", model.QueryRequest{
+		State:   "sc", // case-insensitive
+		Payload: []byte(`{"placa":"XYZ"}`),
+	})
+
+	if !called {
+		t.Fatal("SC parser was not invoked")
+	}
+	if got.Status != model.StatusSuccess || got.Source != "DETRAN-SC" || got.JobID != "job-sc" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+// TestExecuteIngestMissingPayload rejects an ingest state with no payload.
+func TestExecuteIngestMissingPayload(t *testing.T) {
+	svc := NewService(nil, newLog(), false)
+	svc.RegisterParser("SC", func(raw []byte) (*model.QueryResponse, error) {
+		t.Fatal("parser should not run without a payload")
+		return nil, nil
+	})
+
+	got := svc.Execute(context.Background(), "job-x", model.QueryRequest{State: "SC"})
+	if got.Status != model.StatusError || !hasStepErr(got.Errors, "payload") {
+		t.Errorf("expected payload error, got %+v", got)
+	}
+}
+
+// TestExecuteUnconfiguredRS returns a config error when the fetch portal is nil.
+func TestExecuteUnconfiguredRS(t *testing.T) {
+	svc := NewService(nil, newLog(), false)
+	got := svc.Execute(context.Background(), "job-y", model.QueryRequest{Plate: "ABC1D23", Types: []model.QueryType{model.QueryRegistration}})
+	if got.Status != model.StatusError || !hasStepErr(got.Errors, "config") {
+		t.Errorf("expected config error, got %+v", got)
+	}
+}
+
+func hasStepErr(errs []model.StepError, step string) bool {
+	for _, e := range errs {
+		if e.Step == step {
+			return true
+		}
+	}
+	return false
+}
+
 func TestExecuteSuccess(t *testing.T) {
 	fake := fakePortal{resp: &model.QueryResponse{Vehicle: &model.Vehicle{MakeModel: "VW/FUSCA"}}}
 	svc := NewService(fake, newLog(), false)

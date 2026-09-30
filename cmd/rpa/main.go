@@ -17,12 +17,11 @@ import (
 	"github.com/paulorosantos/desphub-rpa/internal/config"
 	"github.com/paulorosantos/desphub-rpa/internal/logger"
 	"github.com/paulorosantos/desphub-rpa/internal/portals/detranrs"
+	"github.com/paulorosantos/desphub-rpa/internal/portals/detransc"
 	"github.com/paulorosantos/desphub-rpa/internal/query"
 )
 
 func main() {
-	// Dev convenience: load .env if present. It does NOT override variables
-	// already set in the real environment, so systemd/Docker still win in prod.
 	_ = godotenv.Load()
 
 	cfg, err := config.Load()
@@ -39,27 +38,27 @@ func main() {
 		"anonymizePII", cfg.AnonymizePII,
 	)
 
-	var svc *query.Service
+	var portal query.Portal
 	switch cfg.LoginMode {
 	case "token":
-		// Headless VPS: no browser. The token is injected via endpoint.
-		portal := detranrs.NewTokenPortal(cfg.DetranRSURL)
-		svc = query.NewService(portal, log, cfg.AnonymizePII)
+		portal = detranrs.NewTokenPortal(cfg.DetranRSURL)
 		if cfg.SessionTokenAPIKey == "" {
 			log.Warn("LOGIN_MODE=token without SESSION_TOKEN_APIKEY: the token endpoint will be UNPROTECTED")
 		}
 		log.Info("DETRAN-RS portal in TOKEN mode (external injection via POST /api/detran/session/token)")
 	case "manual":
-		portal := detranrs.NewSessionPortal(cfg.ChromeDebugURL, browser.Options{
+		portal = detranrs.NewSessionPortal(cfg.ChromeDebugURL, browser.Options{
 			NavTimeout:   cfg.NavTimeout,
 			PageLoadWait: cfg.PageLoadWait,
 		}, cfg.DetranRSURL, log)
-		svc = query.NewService(portal, log, cfg.AnonymizePII)
 		log.Info("DETRAN-RS portal in MANUAL LOGIN mode (reconnects to Chrome per login)",
 			"chromeDebugURL", cfg.ChromeDebugURL)
 	default:
-		log.Warn("LOGIN_MODE empty: set 'token' (VPS) or 'manual' (local); queries will return 501")
+		log.Warn("LOGIN_MODE empty: DETRAN-RS disabled (state=RS returns 501); DETRAN-SC ingest still available")
 	}
+
+	svc := query.NewService(portal, log, cfg.AnonymizePII)
+	svc.RegisterParser("SC", detransc.ParseVehicle)
 
 	mux := http.NewServeMux()
 	api.NewServer(log, svc, cfg.SessionTokenAPIKey).Routes(mux)

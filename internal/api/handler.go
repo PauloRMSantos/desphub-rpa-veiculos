@@ -85,8 +85,13 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	if resp.Status == model.StatusError {
 		status = http.StatusBadGateway
-		if hasStep(resp.Errors, "reconnect") {
+		switch {
+		case hasStep(resp.Errors, "reconnect"):
 			status = http.StatusServiceUnavailable
+		case hasStep(resp.Errors, "config"):
+			status = http.StatusNotImplemented
+		case hasStep(resp.Errors, "payload"), hasStep(resp.Errors, "parse"):
+			status = http.StatusUnprocessableEntity
 		}
 	}
 	writeJSON(w, status, resp)
@@ -174,7 +179,7 @@ func validate(req model.QueryRequest) []model.StepError {
 			Message: "provide at least plate or renavam",
 		})
 	}
-	if len(req.Types) == 0 {
+	if len(req.Types) == 0 && len(req.Payload) == 0 {
 		errs = append(errs, model.StepError{
 			Step:    "validation",
 			Message: "provide at least one query type",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/paulorosantos/desphub-rpa/internal/logger"
@@ -12,31 +13,58 @@ import (
 )
 
 type Portal interface {
-	// Query runs a vehicle query. creds carries per-request (multi-tenant)
-	// session credentials; when nil the portal uses its own session/token.
 	Query(ctx context.Context, plate, renavam string, creds *model.SessionCredentials) (*model.QueryResponse, error)
 	Name() string
 }
 
+type ParseFunc func(raw []byte) (*model.QueryResponse, error)
+
 type Service struct {
-	portal    Portal
+	portal    Portal               
+	parsers   map[string]ParseFunc 
 	log       *slog.Logger
-	anonymize bool 
+	anonymize bool
 }
 
 func NewService(portal Portal, log *slog.Logger, anonymize bool) *Service {
-	return &Service{portal: portal, log: log, anonymize: anonymize}
+	return &Service{portal: portal, parsers: map[string]ParseFunc{}, log: log, anonymize: anonymize}
+}
+
+func (s *Service) RegisterParser(state string, fn ParseFunc) {
+	s.parsers[strings.ToUpper(strings.TrimSpace(state))] = fn
 }
 
 func (s *Service) Execute(ctx context.Context, jobID string, req model.QueryRequest) model.QueryResponse {
 	log := logger.FromContext(ctx, s.log)
-	base := model.QueryResponse{
-		JobID:       jobID,
-		Plate:       req.Plate,
-		Source:      s.portal.Name(),
-		CollectedAt: time.Now().UTC(),
+	now := time.Now().UTC()
+	state := strings.ToUpper(strings.TrimSpace(req.State))
+	if state == "" {
+		state = "RS"
 	}
 
+	fail := func(step, msg string) model.QueryResponse {
+		return model.QueryResponse{
+			JobID: jobID, Plate: req.Plate, CollectedAt: now,
+			Status: model.StatusError,
+			Errors: []model.StepError{{Step: step, Message: msg}},
+		}
+	}
+
+	if fn, ok := s.parsers[state]; ok {
+		if len(req.Payload) == 0 {
+			return fail("payload", "state "+state+" requires a captured payload")
+		}
+		resp, err := fn(req.Payload)
+		if err != nil {
+			log.Error("normalize failed", "state", state, "error", err.Error())
+			return fail("parse", err.Error())
+		}
+		return s.finalize(resp, jobID, req, now)
+	}
+
+	if s.portal == nil {
+		return fail("config", "state "+state+" not configured (set LOGIN_MODE=token|manual)")
+	}
 	resp, err := s.portal.Query(ctx, req.Plate, req.Renavam, req.Session)
 	if err != nil {
 		step := "portal"
@@ -44,21 +72,21 @@ func (s *Service) Execute(ctx context.Context, jobID string, req model.QueryRequ
 			step = "reconnect"
 		}
 		log.Error("portal query failed", "step", step, "error", err.Error())
-		base.Status = model.StatusError
-		base.Errors = []model.StepError{{Step: step, Message: err.Error()}}
-		return base
+		return fail(step, err.Error())
 	}
-
-	resp.JobID = jobID
-	resp.CollectedAt = base.CollectedAt
 	if resp.Source == "" {
 		resp.Source = s.portal.Name()
 	}
+	return s.finalize(resp, jobID, req, now)
+}
+
+func (s *Service) finalize(resp *model.QueryResponse, jobID string, req model.QueryRequest, now time.Time) model.QueryResponse {
+	resp.JobID = jobID
+	resp.CollectedAt = now
 	if resp.Plate == "" {
 		resp.Plate = req.Plate
 	}
 	resp.Status = classify(resp)
-
 	if s.anonymize {
 		pii.Anonymize(resp)
 	}
